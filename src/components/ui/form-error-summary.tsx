@@ -1,0 +1,65 @@
+'use client'
+
+import { useEffect, useRef } from 'react'
+import { AlertCircle } from 'lucide-react'
+
+export type FieldErrorEntry = { fieldId: string; label: string; message: string }
+
+// A submission rejected by the server has to reach a keyboard or screen-reader
+// user without a scroll hunt: the summary takes focus and each entry moves
+// focus to the field it belongs to.
+export function FormErrorSummary({
+	title = 'This form could not be submitted',
+	description,
+	errors
+}: {
+	title?: string
+	description?: string
+	errors: readonly FieldErrorEntry[]
+}) {
+	const headingRef = useRef<HTMLParagraphElement>(null)
+
+	useEffect(() => {
+		if (errors.length > 0) headingRef.current?.focus()
+	}, [errors])
+
+	if (errors.length === 0) return null
+
+	return (
+		<div
+			role="alert"
+			className="rounded-xl border border-danger/25 bg-danger/6 p-4 sm:p-5"
+			data-testid="form-error-summary"
+		>
+			<p
+				ref={headingRef}
+				tabIndex={-1}
+				className="flex items-start gap-2 text-sm font-semibold text-danger outline-none"
+			>
+				<AlertCircle aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
+				<span>{title}</span>
+			</p>
+			{description != null && (
+				<p className="mt-2 text-sm leading-relaxed text-muted-foreground">{description}</p>
+			)}
+			<ul className="mt-3 flex list-none flex-col gap-1.5 p-0">
+				{errors.map((error) => (
+					<li key={error.fieldId}>
+						<a
+							href={`#${error.fieldId}`}
+							className="text-sm text-danger underline underline-offset-2"
+							onClick={(event) => {
+								const target = document.getElementById(error.fieldId)
+								if (target == null) return
+								event.preventDefault()
+								target.focus()
+							}}
+						>
+							{error.label}: {error.message}
+						</a>
+					</li>
+				))}
+			</ul>
+		</div>
+	)
+}

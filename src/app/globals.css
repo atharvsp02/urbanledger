@@ -6,34 +6,53 @@
 	--background: #fcfbf8;
 	--foreground: #202725;
 	--surface: #ffffff;
+	--surface-soft: #f5f4ef;
+	--surface-hover: #f0efe9;
+	--surface-tint: #eef1fd;
 	--muted-foreground: #5f6864;
+	--faint-foreground: #7c847f;
 	--border: #dedfd9;
+	--border-strong: #c4c7bf;
 	--accent: #0021cc;
+	--accent-hover: #001a9e;
 	--accent-foreground: #ffffff;
+	--success: #18794e;
+	--warning: #8a5a00;
+	--danger: #b3261e;
 }
 
 @theme inline {
 	--color-background: var(--background);
 	--color-foreground: var(--foreground);
 	--color-surface: var(--surface);
+	--color-surface-soft: var(--surface-soft);
+	--color-surface-hover: var(--surface-hover);
+	--color-surface-tint: var(--surface-tint);
 	--color-muted-foreground: var(--muted-foreground);
+	--color-faint-foreground: var(--faint-foreground);
 	--color-border: var(--border);
+	--color-border-strong: var(--border-strong);
 	--color-accent: var(--accent);
+	--color-accent-hover: var(--accent-hover);
 	--color-accent-foreground: var(--accent-foreground);
-	--font-sans: Arial, Helvetica, sans-serif;
-	--font-mono: 'SFMono-Regular', Consolas, monospace;
+	--color-success: var(--success);
+	--color-warning: var(--warning);
+	--color-danger: var(--danger);
+	--font-sans:
+		ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+	--font-mono: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
 }
 
 body {
 	margin: 0;
 	background: var(--background);
 	color: var(--foreground);
-	font-family: Arial, Helvetica, sans-serif;
+	font-family: var(--font-sans);
 	line-height: 1.5;
 	-webkit-font-smoothing: antialiased;
 }
 
 :focus-visible {
 	outline: 2px solid var(--accent);
-	outline-offset: 4px;
+	outline-offset: 2px;
 }

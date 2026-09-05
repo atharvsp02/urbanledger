@@ -9,6 +9,7 @@ export {
 	listSalesOrders,
 	updateDraftSalesOrder
 } from '@/server/sales/sales-orders'
+export { reverseCustomerInvoice } from '@/server/payments/commands'
 export {
 	deliverSalesOrder,
 	getSalesDelivery,

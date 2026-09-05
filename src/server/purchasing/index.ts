@@ -24,3 +24,4 @@ export {
 	postVendorBill,
 	updateDraftVendorBill
 } from '@/server/purchasing/vendor-bills'
+export { reverseVendorBill } from '@/server/payments/commands'

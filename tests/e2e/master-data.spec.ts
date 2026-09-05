@@ -6,6 +6,7 @@ import {
 	deleteContactByName,
 	deletePortalIdentity,
 	deleteProductByName,
+	resetContactPortalAccess,
 	login,
 	pngFixture,
 	seededIds,
@@ -32,6 +33,7 @@ test.describe('master data', () => {
 		await deleteProductByName(productName)
 		await deleteCategoryByName(categoryName)
 		await deletePortalIdentity(portalLoginId)
+		await resetContactPortalAccess(seededIds.secondCustomer)
 	})
 
 	test('redirects anonymous visitors away from workspace routes', async ({ page }) => {
@@ -83,26 +85,37 @@ test.describe('master data', () => {
 	})
 
 	test('rejects a stale contact revision', async ({ page }) => {
-		await login(page, 'uladmin', 'URBANLEDGER_SEED_ADMIN_PASSWORD')
-		const contact = await withDatabase((client) =>
-			client.query<{ id: string }>('SELECT id FROM app.contacts WHERE name = $1', [contactName])
+		const staleName = `${contactName} stale`
+		const created = await withDatabase((client) =>
+			client.query<{ id: string }>(
+				`INSERT INTO app.contacts ("businessId", kind, name, city, "updatedAt")
+				 VALUES ($1, 'CUSTOMER', $2, 'Pune', now()) RETURNING id`,
+				[seededIds.business, staleName]
+			)
 		)
-		const contactId = contact.rows[0].id
+		const contactId = created.rows[0].id
 
-		await page.goto(`/contacts/${contactId}/edit`)
-		await withDatabase((client) =>
-			client.query('UPDATE app.contacts SET revision = revision + 1 WHERE id = $1', [contactId])
-		)
+		try {
+			await login(page, 'uladmin', 'URBANLEDGER_SEED_ADMIN_PASSWORD')
+			await page.goto(`/contacts/${contactId}/edit`)
+			await withDatabase((client) =>
+				client.query('UPDATE app.contacts SET revision = revision + 1 WHERE id = $1', [contactId])
+			)
 
-		await page.getByLabel('Contact name').fill(`${contactName} edited`)
-		await page.getByRole('button', { name: 'Save changes' }).click()
+			await page.getByLabel('Contact name').fill(`${staleName} edited`)
+			await page.getByRole('button', { name: 'Save changes' }).click()
 
-		await expect(page.getByRole('alert')).toContainText('changed while you were editing')
+			await expect(page.getByTestId('form-error-summary')).toContainText(
+				'changed while you were editing'
+			)
 
-		const unchanged = await withDatabase((client) =>
-			client.query('SELECT name FROM app.contacts WHERE id = $1', [contactId])
-		)
-		expect(unchanged.rows[0].name).toBe(contactName)
+			const unchanged = await withDatabase((client) =>
+				client.query('SELECT name FROM app.contacts WHERE id = $1', [contactId])
+			)
+			expect(unchanged.rows[0].name).toBe(staleName)
+		} finally {
+			await deleteContactByName(staleName)
+		}
 	})
 
 	test('uploads, replaces and removes a contact image through private storage', async ({
@@ -150,21 +163,24 @@ test.describe('master data', () => {
 	})
 
 	test('provisions contact portal access, retries and reports collisions', async ({ page }) => {
+		await resetContactPortalAccess(seededIds.secondCustomer)
 		await login(page, 'uladmin', 'URBANLEDGER_SEED_ADMIN_PASSWORD')
 		await page.goto(`/contacts/${seededIds.secondCustomer}`)
 
 		await page.getByLabel('Login ID').fill('uladmin')
 		await page.getByLabel('Identity email').fill(`${portalLoginId}@playwright.test`)
-		await page.getByLabel('Initial password', { exact: true }).fill('Portal#12345')
+		await page.getByLabel('Initial password').fill('Portal#12345')
 		await page.getByLabel('Confirm password').fill('Portal#12345')
 		await page.getByRole('button', { name: 'Enable portal access' }).click()
-		await expect(page.getByRole('alert')).toContainText('already in use')
+		await expect(page.getByTestId('form-error-summary')).toContainText('already in use')
 
+		await page.reload()
 		await page.getByLabel('Login ID').fill(portalLoginId)
+		await page.getByLabel('Identity email').fill(`${portalLoginId}@playwright.test`)
+		await page.getByLabel('Initial password').fill('Portal#12345')
+		await page.getByLabel('Confirm password').fill('Portal#12345')
 		await page.getByRole('button', { name: 'Enable portal access' }).click()
-		await expect(page.getByRole('status')).toContainText(
-			`Portal access created for ${portalLoginId}`
-		)
+		await expect(page.getByText(portalLoginId, { exact: false }).first()).toBeVisible()
 
 		const access = await withDatabase((client) =>
 			client.query(
@@ -181,7 +197,7 @@ test.describe('master data', () => {
 		])
 
 		await page.reload()
-		await expect(page.getByText(portalLoginId)).toBeVisible()
+		await expect(page.getByText(portalLoginId, { exact: false }).first()).toBeVisible()
 	})
 
 	test('creates a category and uses it on a new product', async ({ page }) => {

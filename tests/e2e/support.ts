@@ -74,6 +74,35 @@ export async function deleteCategoryByName(name: string) {
 	)
 }
 
+export async function resetContactPortalAccess(contactId: string) {
+	const emails = await withDatabase(async (client) => {
+		const rows = await client.query<{ normalizedEmail: string }>(
+			`SELECT au."normalizedEmail" FROM app.portal_access pa
+			 JOIN app.application_users au ON au.id = pa."userId"
+			 WHERE pa."contactId" = $1`,
+			[contactId]
+		)
+		await client.query(
+			`DELETE FROM app.application_users WHERE id IN (
+				SELECT "userId" FROM app.portal_access WHERE "contactId" = $1
+			)`,
+			[contactId]
+		)
+		return rows.rows.map((row) => row.normalizedEmail)
+	})
+
+	if (emails.length === 0) return
+
+	const admin = adminSupabase()
+	const { data } = await admin.auth.admin.listUsers({ page: 1, perPage: 100 })
+
+	for (const user of data?.users ?? []) {
+		if (user.email && emails.includes(user.email.toLowerCase())) {
+			await admin.auth.admin.deleteUser(user.id)
+		}
+	}
+}
+
 export async function deletePortalIdentity(loginId: string) {
 	const normalized = loginId.toLowerCase()
 

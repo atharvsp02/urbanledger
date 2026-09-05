@@ -5,6 +5,7 @@ import {
 	Package,
 	Percent,
 	Scale,
+	Tags,
 	ShoppingCart,
 	Users
 } from 'lucide-react'
@@ -85,6 +86,13 @@ const NAV_DEFINITION: readonly NavDefinition[] = [
 				label: 'Taxes',
 				icon: <Percent className="size-4" />,
 				href: '/accounting/taxes',
+				capability: 'masters:read'
+			},
+			{
+				id: 'analytic-accounts',
+				label: 'Analytic accounts',
+				icon: <Tags className="size-4" />,
+				href: '/accounting/analytic-accounts',
 				capability: 'masters:read'
 			},
 			{

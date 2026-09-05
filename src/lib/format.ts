@@ -63,3 +63,14 @@ export function formatBusinessDate(date: string): string {
 	if (monthLabel == null) throw new Error('formatBusinessDate received an out-of-range month')
 	return `${day} ${monthLabel} ${year}`
 }
+
+// Canonical amounts arrive at the column scale; display keeps at least two
+// decimals and drops the padding beyond them.
+export function trimMoneyScale(amount: string, minimumFractionDigits = 2): string {
+	if (!DECIMAL_PATTERN.test(amount)) throw new Error('trimMoneyScale expects a decimal string')
+	if (!amount.includes('.')) return amount
+
+	const [whole, fraction] = amount.split('.')
+	const trimmed = fraction.replace(/0+$/, '').padEnd(minimumFractionDigits, '0')
+	return trimmed.length === 0 ? whole : `${whole}.${trimmed}`
+}

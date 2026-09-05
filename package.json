@@ -25,6 +25,7 @@
 		"format": "prettier --write .",
 		"format:check": "prettier --check .",
 		"check": "pnpm lint && pnpm typecheck && pnpm format:check",
+		"test:accounting": "node --conditions=react-server --import tsx --test --test-concurrency=1 tests/accounting/*.test.ts",
 		"test:e2e": "playwright test"
 	},
 	"dependencies": {

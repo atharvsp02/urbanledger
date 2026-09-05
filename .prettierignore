@@ -1,5 +1,6 @@
 inspiration/
 docs/
+.worktrees/
 AGENTS.md
 CLAUDE.md
 node_modules/

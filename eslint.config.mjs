@@ -11,6 +11,7 @@ export default defineConfig([
 		'build/**',
 		'dist/**',
 		'coverage/**',
+		'.worktrees/**',
 		'inspiration/**',
 		'docs/**',
 		'next-env.d.ts'

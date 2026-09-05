@@ -1,5 +1,6 @@
 /inspiration
 /docs
+/.worktrees/
 /AGENTS.md
 /CLAUDE.md
 
@@ -33,4 +34,5 @@ yarn-debug.log*
 yarn-error.log*
 .idea/
 .claude-logs/
+/.claude/settings.json
 .claude/settings.local.json

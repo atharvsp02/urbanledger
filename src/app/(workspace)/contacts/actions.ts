@@ -4,10 +4,12 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import type { ActionResult } from '@/lib/contracts/errors'
 import { contactInputSchema, type ContactKind } from '@/lib/masters/contact'
+import { removeContactImage, replaceContactImage } from '@/server/masters/contact-images'
 import { createContact, setContactArchived, updateContact } from '@/server/masters/contacts'
 import { toActionResult } from '@/server/actions/result'
 
 export type ContactActionState = ActionResult<{ id: string }> | null
+export type ContactImageState = ActionResult<{ id: string }> | null
 
 function readContactInput(formData: FormData) {
 	const read = (key: string) => String(formData.get(key) ?? '')
@@ -58,4 +60,32 @@ export async function setContactArchivedAction(
 
 	revalidatePath('/contacts')
 	revalidatePath(`/contacts/${contactId}`)
+}
+
+export async function saveContactImageAction(
+	_state: ContactImageState,
+	formData: FormData
+): Promise<ContactImageState> {
+	const contactId = String(formData.get('contactId') ?? '')
+	const intent = String(formData.get('intent') ?? 'replace')
+	const file = formData.get('image')
+
+	const result = await toActionResult(async () => {
+		if (intent === 'remove') {
+			return removeContactImage(contactId)
+		}
+
+		if (!(file instanceof File)) {
+			return { id: contactId }
+		}
+
+		await replaceContactImage(contactId, file)
+		return { id: contactId }
+	})
+
+	if (result.ok) {
+		revalidatePath(`/contacts/${contactId}`)
+	}
+
+	return result
 }

@@ -8,9 +8,11 @@ import { EmptyState } from '@/components/ui/state-panel'
 import { CONTACT_KIND_LABELS } from '@/lib/masters/contact'
 import { formatBusinessDate } from '@/lib/format'
 import { getActor } from '@/server/auth/actor'
+import { getContactImage } from '@/server/masters/contact-images'
 import { getContactDetail } from '@/server/masters/contacts'
 import { ApplicationError } from '@/server/errors/application-error'
 import { ArchiveControl } from '@/app/(workspace)/contacts/[id]/archive-control'
+import { ContactImage } from '@/app/(workspace)/contacts/[id]/contact-image'
 import { PortalStateBadge } from '@/app/(workspace)/contacts/portal-state-badge'
 
 export default async function ContactDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -25,6 +27,7 @@ export default async function ContactDetailPage({ params }: { params: Promise<{ 
 		throw error
 	}
 
+	const image = await getContactImage(id)
 	const canUpdate = actor.capabilities.includes('contacts:update')
 	const canArchive = actor.capabilities.includes('masters:archive')
 
@@ -89,6 +92,15 @@ export default async function ContactDetailPage({ params }: { params: Promise<{ 
 							</div>
 						))}
 					</dl>
+				</WorkSurface>
+
+				<WorkSurface title="Profile image">
+					<ContactImage
+						contactId={contact.id}
+						contactName={contact.name}
+						imageUrl={image?.url ?? null}
+						canEdit={canUpdate}
+					/>
 				</WorkSurface>
 			</div>
 

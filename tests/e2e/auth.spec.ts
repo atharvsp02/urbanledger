@@ -120,7 +120,11 @@ test.describe('authentication and access control', () => {
 	test('signs an Admin in and out', async ({ page }) => {
 		await login(page, 'uladmin', 'URBANLEDGER_SEED_ADMIN_PASSWORD')
 		await expect(page).toHaveURL('/dashboard')
-		await expect(page.getByRole('heading', { name: 'Welcome, Riya Sharma' })).toBeVisible()
+		await expect(page.getByRole('heading', { name: 'Dashboard', level: 1 })).toBeVisible()
+
+		const account = page.getByRole('complementary').or(page.locator('aside'))
+		await expect(account.getByText('Riya Sharma')).toBeVisible()
+		await expect(account.getByText('Admin', { exact: true })).toBeVisible()
 
 		const session = await page.request.get('/api/auth/session')
 		expect(session.status()).toBe(200)

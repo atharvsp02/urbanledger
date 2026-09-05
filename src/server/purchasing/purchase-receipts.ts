@@ -19,10 +19,13 @@ import {
 } from '@/lib/contracts/purchase-receipt'
 import { requireCurrentAccountingActor } from '@/server/accounting/authorize'
 import { getPrisma } from '@/server/db/prisma'
+import { allocateDocumentNumber } from '@/server/documents/sequences'
 import { ApplicationError } from '@/server/errors/application-error'
 import { resolvePage } from '@/server/masters/pagination'
-import { executePurchasingOperation, purchasingRequestHash } from '@/server/purchasing/operation'
-import { allocatePurchaseDocumentNumber } from '@/server/purchasing/sequences'
+import {
+	canonicalRequestHash,
+	executeIdempotentOperation
+} from '@/server/operations/command-operation'
 
 type PurchaseTransaction = Prisma.TransactionClient
 
@@ -114,7 +117,7 @@ export async function receivePurchaseOrder(
 	if (!parsed.success) return validationFailure(parsed.error)
 
 	const operation = 'purchase_receipt.create'
-	const hash = purchasingRequestHash({
+	const hash = canonicalRequestHash({
 		operation,
 		actorUserId: actor.userId,
 		purchaseOrderId: parsed.data.purchaseOrderId,
@@ -123,7 +126,7 @@ export async function receivePurchaseOrder(
 	})
 
 	try {
-		const result = await executePurchasingOperation({
+		const result = await executeIdempotentOperation({
 			actor,
 			capability: 'transactions:create',
 			operationKey: parsed.data.operationKey,
@@ -203,7 +206,7 @@ export async function receivePurchaseOrder(
 					)
 				}
 
-				const receiptNumber = await allocatePurchaseDocumentNumber(
+				const receiptNumber = await allocateDocumentNumber(
 					transaction,
 					actor.businessId,
 					'PURCHASE_RECEIPT',
@@ -232,14 +235,14 @@ export async function receivePurchaseOrder(
 							sourceOrderLineId: orderLine.id,
 							productId: orderLine.productId,
 							productNameSnapshot: orderLine.productNameSnapshot,
-							productKindSnapshot: orderLine.product.kind,
+							productKindSnapshot: orderLine.productKindSnapshot,
 							quantity: orderLine.quantity,
 							position: orderLine.position
 						},
 						select: { id: true }
 					})
 
-					if (orderLine.product.kind !== 'SERVICE') {
+					if (orderLine.productKindSnapshot !== 'SERVICE') {
 						await transaction.inventoryMovement.create({
 							data: {
 								businessId: actor.businessId,

@@ -35,10 +35,13 @@ import {
 	type PostedJournalLine
 } from '@/server/accounting/posting-kernel'
 import { getPrisma } from '@/server/db/prisma'
+import { allocateDocumentNumber } from '@/server/documents/sequences'
 import { ApplicationError } from '@/server/errors/application-error'
 import { resolvePage } from '@/server/masters/pagination'
-import { executePurchasingOperation, purchasingRequestHash } from '@/server/purchasing/operation'
-import { allocatePurchaseDocumentNumber } from '@/server/purchasing/sequences'
+import {
+	canonicalRequestHash,
+	executeIdempotentOperation
+} from '@/server/operations/command-operation'
 
 type PurchaseTransaction = Prisma.TransactionClient
 
@@ -239,7 +242,7 @@ export async function createVendorBillFromPurchaseOrder(
 	if (!parsed.success) return validationFailure(parsed.error)
 
 	const operation = 'vendor_bill.create'
-	const hash = purchasingRequestHash({
+	const hash = canonicalRequestHash({
 		operation,
 		actorUserId: actor.userId,
 		purchaseOrderId: parsed.data.purchaseOrderId,
@@ -250,7 +253,7 @@ export async function createVendorBillFromPurchaseOrder(
 	})
 
 	try {
-		const result = await executePurchasingOperation({
+		const result = await executeIdempotentOperation({
 			actor,
 			capability: 'transactions:create',
 			operationKey: parsed.data.operationKey,
@@ -333,7 +336,7 @@ export async function createVendorBillFromPurchaseOrder(
 					)
 				}
 
-				const billNumber = await allocatePurchaseDocumentNumber(
+				const billNumber = await allocateDocumentNumber(
 					transaction,
 					actor.businessId,
 					'VENDOR_BILL',
@@ -470,6 +473,7 @@ export async function updateDraftVendorBill(
 							taxNameSnapshot: tax?.name ?? null,
 							taxRateSnapshot: tax?.rate ?? null,
 							taxRevisionSnapshot: tax?.revision ?? null,
+							taxAccountIdSnapshot: tax?.inputAccountId ?? null,
 							taxAmount: formatJournalAmount(taxAmount),
 							lineTotal: formatJournalAmount(line.lineNetTotal.plus(taxAmount)),
 							analyticAccountId: selection.analyticAccountId
@@ -522,7 +526,7 @@ export async function cancelDraftVendorBill(
 	if (!parsed.success) return validationFailure(parsed.error)
 
 	const operation = 'vendor_bill.cancel'
-	const hash = purchasingRequestHash({
+	const hash = canonicalRequestHash({
 		operation,
 		actorUserId: actor.userId,
 		vendorBillId: parsed.data.vendorBillId,
@@ -530,7 +534,7 @@ export async function cancelDraftVendorBill(
 	})
 
 	try {
-		const result = await executePurchasingOperation({
+		const result = await executeIdempotentOperation({
 			actor,
 			capability: 'transactions:create',
 			operationKey: parsed.data.operationKey,
@@ -606,7 +610,7 @@ export async function postVendorBill(
 	if (!parsed.success) return validationFailure(parsed.error)
 
 	const operation = 'vendor_bill.post'
-	const hash = purchasingRequestHash({
+	const hash = canonicalRequestHash({
 		operation,
 		actorUserId: actor.userId,
 		vendorBillId: parsed.data.vendorBillId,
@@ -615,7 +619,7 @@ export async function postVendorBill(
 	})
 
 	try {
-		const result = await executePurchasingOperation({
+		const result = await executeIdempotentOperation({
 			actor,
 			capability: 'transactions:post',
 			operationKey: parsed.data.operationKey,

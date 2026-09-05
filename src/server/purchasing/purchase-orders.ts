@@ -164,7 +164,7 @@ async function requirePurchaseDependencies(
 	const productIds = [...new Set(input.lines.map((line) => line.productId))]
 	const products = await transaction.product.findMany({
 		where: { id: { in: productIds }, businessId },
-		select: { id: true, name: true, archivedAt: true }
+		select: { id: true, name: true, kind: true, archivedAt: true }
 	})
 
 	if (products.length !== productIds.length) {
@@ -625,6 +625,8 @@ export async function createPurchaseOrder(
 						contactId: commercial.vendorId,
 						number,
 						orderDate: asBusinessDate(commercial.orderDate),
+						netTotal: formatJournalAmount(commercial.total),
+						taxTotal: '0.00',
 						total: formatJournalAmount(commercial.total),
 						createdById: actor.userId
 					},
@@ -643,9 +645,12 @@ export async function createPurchaseOrder(
 							orderId: order.id,
 							productId: line.productId,
 							productNameSnapshot: product.name,
+							productKindSnapshot: product.kind,
 							quantity: line.quantity.toFixed(4),
 							unitPriceSnapshot: line.unitPrice.toFixed(4),
 							lineTotal: formatJournalAmount(line.lineTotal),
+							taxAmount: '0.00',
+							grossTotal: formatJournalAmount(line.lineTotal),
 							position: index
 						}
 					})
@@ -698,6 +703,8 @@ export async function updateDraftPurchaseOrder(
 					data: {
 						contactId: commercial.vendorId,
 						orderDate: asBusinessDate(commercial.orderDate),
+						netTotal: formatJournalAmount(commercial.total),
+						taxTotal: '0.00',
 						total: formatJournalAmount(commercial.total),
 						revision: { increment: 1 }
 					}
@@ -725,9 +732,12 @@ export async function updateDraftPurchaseOrder(
 							orderId: parsed.data.purchaseOrderId,
 							productId: line.productId,
 							productNameSnapshot: product.name,
+							productKindSnapshot: product.kind,
 							quantity: line.quantity.toFixed(4),
 							unitPriceSnapshot: line.unitPrice.toFixed(4),
 							lineTotal: formatJournalAmount(line.lineTotal),
+							taxAmount: '0.00',
+							grossTotal: formatJournalAmount(line.lineTotal),
 							position: index
 						}
 					})

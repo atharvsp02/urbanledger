@@ -2,7 +2,7 @@ import 'server-only'
 import type { SequenceKind } from '@/generated/prisma/client'
 import type { Prisma } from '@/generated/prisma/client'
 
-export async function allocatePurchaseDocumentNumber(
+export async function allocateDocumentNumber(
 	transaction: Prisma.TransactionClient,
 	businessId: string,
 	kind: SequenceKind,

@@ -6,11 +6,11 @@ import { requireCurrentAccountingActor } from '@/server/accounting/authorize'
 import { getPrisma } from '@/server/db/prisma'
 import { ApplicationError } from '@/server/errors/application-error'
 
-type PurchaseTransaction = Prisma.TransactionClient
+type CommandTransaction = Prisma.TransactionClient
 
 const maximumTransactionAttempts = 10
 
-export function purchasingRequestHash(payload: object) {
+export function canonicalRequestHash(payload: object) {
 	return createHash('sha256').update(JSON.stringify(payload)).digest('hex')
 }
 
@@ -26,7 +26,7 @@ function waitBeforeRetry(attempt: number) {
 	return new Promise((resolve) => setTimeout(resolve, delayMilliseconds))
 }
 
-export async function executePurchasingOperation<T>(input: {
+export async function executeIdempotentOperation<T>(input: {
 	actor: Actor
 	capability: Capability
 	operationKey: string
@@ -34,7 +34,7 @@ export async function executePurchasingOperation<T>(input: {
 	requestHash: string
 	parseStoredResult: (value: unknown) => T | null
 	resourceId: (result: T) => string
-	command: (transaction: PurchaseTransaction, accountingLockDate: Date | null) => Promise<T>
+	command: (transaction: CommandTransaction, accountingLockDate: Date | null) => Promise<T>
 }) {
 	const database = getPrisma()
 
@@ -71,7 +71,7 @@ export async function executePurchasingOperation<T>(input: {
 						if (!existing.committedAt || !storedResult) {
 							throw new ApplicationError(
 								'CONFLICT',
-								'The matching purchase request is still being processed.'
+								'The matching command is still being processed.'
 							)
 						}
 
@@ -116,7 +116,7 @@ export async function executePurchasingOperation<T>(input: {
 			if (isRetryableTransactionFailure(error)) {
 				throw new ApplicationError(
 					'CONFLICT',
-					'The purchase request could not be serialized. Retry with the same operation key.'
+					'The command could not be serialized. Retry with the same operation key.'
 				)
 			}
 
@@ -124,5 +124,5 @@ export async function executePurchasingOperation<T>(input: {
 		}
 	}
 
-	throw new ApplicationError('INTERNAL_ERROR', 'The purchase request did not complete.')
+	throw new ApplicationError('INTERNAL_ERROR', 'The command did not complete.')
 }

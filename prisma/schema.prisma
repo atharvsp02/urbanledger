@@ -129,6 +129,7 @@ enum SequenceKind {
   PURCHASE_ORDER
   SALES_ORDER
   PURCHASE_RECEIPT
+  SALES_DELIVERY
   CUSTOMER_INVOICE
   VENDOR_BILL
   CUSTOMER_PAYMENT
@@ -156,6 +157,7 @@ model Business {
   products             Product[]
   orders               Order[]
   purchaseReceipts     PurchaseReceipt[]
+  salesDeliveries      SalesDelivery[]
   inventoryMovements   InventoryMovement[]
   financialDocuments   FinancialDocument[]
   ledgerAccounts       LedgerAccount[]
@@ -192,6 +194,7 @@ model ApplicationUser {
   responsibleBudgets        Budget[]                @relation("BudgetResponsible")
   createdOrders             Order[]                 @relation("OrderCreator")
   createdPurchaseReceipts   PurchaseReceipt[]       @relation("PurchaseReceiptCreator")
+  createdSalesDeliveries    SalesDelivery[]         @relation("SalesDeliveryCreator")
   createdFinancialDocuments FinancialDocument[]     @relation("FinancialDocumentCreator")
   createdEntries            JournalEntry[]          @relation("EntryCreator")
   commandOperations         CommandOperation[]      @relation("CommandActor")
@@ -284,6 +287,7 @@ model Contact {
   journalItems       JournalItem[]
   orders             Order[]
   purchaseReceipts   PurchaseReceipt[]
+  salesDeliveries    SalesDelivery[]
   financialDocuments FinancialDocument[]
 
   @@index([businessId, kind, archivedAt])
@@ -322,6 +326,7 @@ model Product {
   category               ProductCategory         @relation(fields: [categoryId], references: [id], onDelete: Restrict)
   orderLines             OrderLine[]
   purchaseReceiptLines   PurchaseReceiptLine[]
+  salesDeliveryLines     SalesDeliveryLine[]
   inventoryMovements     InventoryMovement[]
   financialDocumentLines FinancialDocumentLine[]
 
@@ -338,6 +343,8 @@ model Order {
   number             String              @db.VarChar(40)
   orderDate          DateTime            @db.Date
   state              OrderState          @default(DRAFT)
+  netTotal           Decimal             @db.Decimal(20, 2)
+  taxTotal           Decimal             @default(0) @db.Decimal(20, 2)
   total              Decimal             @db.Decimal(20, 2)
   revision           Int                 @default(1)
   createdById        String              @db.Uuid
@@ -348,6 +355,7 @@ model Order {
   createdBy          ApplicationUser     @relation("OrderCreator", fields: [createdById], references: [id], onDelete: Restrict)
   lines              OrderLine[]
   purchaseReceipt    PurchaseReceipt?
+  salesDelivery      SalesDelivery?
   financialDocuments FinancialDocument[]
 
   @@unique([businessId, kind, number])
@@ -361,17 +369,31 @@ model OrderLine {
   orderId                String                  @db.Uuid
   productId              String                  @db.Uuid
   productNameSnapshot    String                  @db.VarChar(160)
+  productKindSnapshot    ProductKind
   quantity               Decimal                 @db.Decimal(16, 4)
   unitPriceSnapshot      Decimal                 @db.Decimal(20, 4)
   lineTotal              Decimal                 @db.Decimal(20, 2)
+  taxId                  String?                 @db.Uuid
+  taxNameSnapshot        String?                 @db.VarChar(120)
+  taxRateSnapshot        Decimal?                @db.Decimal(7, 4)
+  taxRevisionSnapshot    Int?
+  taxAccountIdSnapshot   String?                 @db.Uuid
+  taxAmount              Decimal                 @default(0) @db.Decimal(20, 2)
+  grossTotal             Decimal                 @db.Decimal(20, 2)
+  analyticAccountId      String?                 @db.Uuid
   position               Int
   order                  Order                   @relation(fields: [orderId], references: [id], onDelete: Cascade)
   product                Product                 @relation(fields: [productId], references: [id], onDelete: Restrict)
   purchaseReceiptLine    PurchaseReceiptLine?
+  salesDeliveryLine      SalesDeliveryLine?
   financialDocumentLines FinancialDocumentLine[]
+  tax                    Tax?                    @relation(fields: [taxId], references: [id], onDelete: Restrict)
+  analyticAccount        AnalyticAccount?        @relation(fields: [analyticAccountId], references: [id], onDelete: Restrict)
 
   @@unique([orderId, position])
   @@index([productId])
+  @@index([taxId])
+  @@index([analyticAccountId])
   @@map("order_lines")
 }
 
@@ -418,18 +440,63 @@ model PurchaseReceiptLine {
   @@map("purchase_receipt_lines")
 }
 
+model SalesDelivery {
+  id                        String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  businessId                String              @db.Uuid
+  orderId                   String              @unique @db.Uuid
+  contactId                 String              @db.Uuid
+  number                    String              @db.VarChar(40)
+  deliveryDate              DateTime            @db.Date
+  sourceOrderNumberSnapshot String              @db.VarChar(40)
+  sourceOrderDateSnapshot   DateTime            @db.Date
+  contactNameSnapshot       String              @db.VarChar(160)
+  createdById               String              @db.Uuid
+  createdAt                 DateTime            @default(now()) @db.Timestamptz(6)
+  business                  Business            @relation(fields: [businessId], references: [id], onDelete: Restrict)
+  order                     Order               @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  contact                   Contact             @relation(fields: [contactId], references: [id], onDelete: Restrict)
+  createdBy                 ApplicationUser     @relation("SalesDeliveryCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  lines                     SalesDeliveryLine[]
+
+  @@unique([businessId, number])
+  @@index([businessId, deliveryDate])
+  @@index([contactId])
+  @@map("sales_deliveries")
+}
+
+model SalesDeliveryLine {
+  id                  String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  deliveryId          String             @db.Uuid
+  sourceOrderLineId   String             @unique @db.Uuid
+  productId           String             @db.Uuid
+  productNameSnapshot String             @db.VarChar(160)
+  productKindSnapshot ProductKind
+  quantity            Decimal            @db.Decimal(16, 4)
+  position            Int
+  delivery            SalesDelivery      @relation(fields: [deliveryId], references: [id], onDelete: Restrict)
+  sourceOrderLine     OrderLine          @relation(fields: [sourceOrderLineId], references: [id], onDelete: Restrict)
+  product             Product            @relation(fields: [productId], references: [id], onDelete: Restrict)
+  inventoryMovement   InventoryMovement?
+
+  @@unique([deliveryId, position])
+  @@index([productId])
+  @@map("sales_delivery_lines")
+}
+
 model InventoryMovement {
-  id                    String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  businessId            String              @db.Uuid
-  productId             String              @db.Uuid
-  purchaseReceiptLineId String              @unique @db.Uuid
-  movementDate          DateTime            @db.Date
-  quantityDelta         Decimal             @db.Decimal(16, 4)
-  productNameSnapshot   String              @db.VarChar(160)
-  createdAt             DateTime            @default(now()) @db.Timestamptz(6)
-  business              Business            @relation(fields: [businessId], references: [id], onDelete: Restrict)
-  product               Product             @relation(fields: [productId], references: [id], onDelete: Restrict)
-  purchaseReceiptLine   PurchaseReceiptLine @relation(fields: [purchaseReceiptLineId], references: [id], onDelete: Restrict)
+  id                    String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  businessId            String               @db.Uuid
+  productId             String               @db.Uuid
+  purchaseReceiptLineId String?              @unique @db.Uuid
+  salesDeliveryLineId   String?              @unique @db.Uuid
+  movementDate          DateTime             @db.Date
+  quantityDelta         Decimal              @db.Decimal(16, 4)
+  productNameSnapshot   String               @db.VarChar(160)
+  createdAt             DateTime             @default(now()) @db.Timestamptz(6)
+  business              Business             @relation(fields: [businessId], references: [id], onDelete: Restrict)
+  product               Product              @relation(fields: [productId], references: [id], onDelete: Restrict)
+  purchaseReceiptLine   PurchaseReceiptLine? @relation(fields: [purchaseReceiptLineId], references: [id], onDelete: Restrict)
+  salesDeliveryLine     SalesDeliveryLine?   @relation(fields: [salesDeliveryLineId], references: [id], onDelete: Restrict)
 
   @@index([businessId, productId, movementDate])
   @@map("inventory_movements")
@@ -471,27 +538,28 @@ model FinancialDocument {
 }
 
 model FinancialDocumentLine {
-  id                  String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  documentId          String            @db.Uuid
-  sourceOrderLineId   String            @db.Uuid
-  productId           String            @db.Uuid
-  productNameSnapshot String            @db.VarChar(160)
-  quantity            Decimal           @db.Decimal(16, 4)
-  unitPriceSnapshot   Decimal           @db.Decimal(20, 4)
-  lineNetTotal        Decimal           @db.Decimal(20, 2)
-  taxId               String?           @db.Uuid
-  taxNameSnapshot     String?           @db.VarChar(120)
-  taxRateSnapshot     Decimal?          @db.Decimal(7, 4)
-  taxRevisionSnapshot Int?
-  taxAmount           Decimal           @default(0) @db.Decimal(20, 2)
-  lineTotal           Decimal           @db.Decimal(20, 2)
-  analyticAccountId   String?           @db.Uuid
-  position            Int
-  document            FinancialDocument @relation(fields: [documentId], references: [id], onDelete: Restrict)
-  sourceOrderLine     OrderLine         @relation(fields: [sourceOrderLineId], references: [id], onDelete: Restrict)
-  product             Product           @relation(fields: [productId], references: [id], onDelete: Restrict)
-  tax                 Tax?              @relation(fields: [taxId], references: [id], onDelete: Restrict)
-  analyticAccount     AnalyticAccount?  @relation(fields: [analyticAccountId], references: [id], onDelete: Restrict)
+  id                   String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  documentId           String            @db.Uuid
+  sourceOrderLineId    String            @db.Uuid
+  productId            String            @db.Uuid
+  productNameSnapshot  String            @db.VarChar(160)
+  quantity             Decimal           @db.Decimal(16, 4)
+  unitPriceSnapshot    Decimal           @db.Decimal(20, 4)
+  lineNetTotal         Decimal           @db.Decimal(20, 2)
+  taxId                String?           @db.Uuid
+  taxNameSnapshot      String?           @db.VarChar(120)
+  taxRateSnapshot      Decimal?          @db.Decimal(7, 4)
+  taxRevisionSnapshot  Int?
+  taxAccountIdSnapshot String?           @db.Uuid
+  taxAmount            Decimal           @default(0) @db.Decimal(20, 2)
+  lineTotal            Decimal           @db.Decimal(20, 2)
+  analyticAccountId    String?           @db.Uuid
+  position             Int
+  document             FinancialDocument @relation(fields: [documentId], references: [id], onDelete: Restrict)
+  sourceOrderLine      OrderLine         @relation(fields: [sourceOrderLineId], references: [id], onDelete: Restrict)
+  product              Product           @relation(fields: [productId], references: [id], onDelete: Restrict)
+  tax                  Tax?              @relation(fields: [taxId], references: [id], onDelete: Restrict)
+  analyticAccount      AnalyticAccount?  @relation(fields: [analyticAccountId], references: [id], onDelete: Restrict)
 
   @@unique([documentId, position])
   @@unique([documentId, sourceOrderLineId])
@@ -568,6 +636,7 @@ model Tax {
   inputAccount           LedgerAccount?          @relation("TaxInputAccount", fields: [inputAccountId], references: [id], onDelete: Restrict)
   outputAccount          LedgerAccount?          @relation("TaxOutputAccount", fields: [outputAccountId], references: [id], onDelete: Restrict)
   financialDocumentLines FinancialDocumentLine[]
+  orderLines             OrderLine[]
 
   @@unique([businessId, name])
   @@index([businessId, archivedAt])
@@ -587,6 +656,7 @@ model AnalyticAccount {
   budgetLines            BudgetLine[]
   journalItems           JournalItem[]
   financialDocumentLines FinancialDocumentLine[]
+  orderLines             OrderLine[]
 
   @@unique([businessId, name])
   @@index([businessId, type, archivedAt])

@@ -484,6 +484,20 @@ async function transitionPurchaseOrder(
 					)
 				}
 
+				if (targetState === 'CANCELLED') {
+					const receipt = await transaction.purchaseReceipt.findUnique({
+						where: { orderId: order.id },
+						select: { id: true }
+					})
+
+					if (receipt) {
+						throw new ApplicationError(
+							'INVALID_STATE',
+							'A received purchase order cannot be cancelled.'
+						)
+					}
+				}
+
 				const canTransition =
 					targetState === 'CONFIRMED'
 						? order.state === 'DRAFT'

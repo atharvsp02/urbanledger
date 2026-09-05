@@ -61,6 +61,17 @@ enum OrderState {
   CANCELLED
 }
 
+enum FinancialDocumentKind {
+  VENDOR_BILL
+  CUSTOMER_INVOICE
+}
+
+enum FinancialDocumentState {
+  DRAFT
+  POSTED
+  CANCELLED
+}
+
 enum AccountType {
   ASSET
   LIABILITY
@@ -117,6 +128,7 @@ enum EntrySource {
 enum SequenceKind {
   PURCHASE_ORDER
   SALES_ORDER
+  PURCHASE_RECEIPT
   CUSTOMER_INVOICE
   VENDOR_BILL
   CUSTOMER_PAYMENT
@@ -143,6 +155,9 @@ model Business {
   productCategories    ProductCategory[]
   products             Product[]
   orders               Order[]
+  purchaseReceipts     PurchaseReceipt[]
+  inventoryMovements   InventoryMovement[]
+  financialDocuments   FinancialDocument[]
   ledgerAccounts       LedgerAccount[]
   journals             Journal[]
   taxes                Tax[]
@@ -158,27 +173,29 @@ model Business {
 }
 
 model ApplicationUser {
-  id                     String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  providerUserId         String                  @unique @db.Uuid
-  loginId                String                  @db.VarChar(12)
-  normalizedLoginId      String                  @unique @db.VarChar(12)
-  normalizedEmail        String                  @unique @db.VarChar(320)
-  displayName            String                  @db.VarChar(160)
-  status                 UserStatus              @default(PROVISIONING)
-  mustChangePassword     Boolean                 @default(false)
-  disabledAt             DateTime?               @db.Timestamptz(6)
-  createdAt              DateTime                @default(now()) @db.Timestamptz(6)
-  updatedAt              DateTime                @updatedAt @db.Timestamptz(6)
-  staffGrants            StaffGrant[]            @relation("GrantUser")
-  issuedStaffGrants      StaffGrant[]            @relation("GrantIssuer")
-  portalAccess           PortalAccess?           @relation("PortalUser")
-  issuedPortalAccess     PortalAccess[]          @relation("PortalIssuer")
-  provisioningOperations ProvisioningOperation[] @relation("ProvisioningActor")
-  responsibleBudgets     Budget[]                @relation("BudgetResponsible")
-  createdOrders          Order[]                 @relation("OrderCreator")
-  createdEntries         JournalEntry[]          @relation("EntryCreator")
-  commandOperations      CommandOperation[]      @relation("CommandActor")
-  auditEvents            AuditEvent[]            @relation("AuditActor")
+  id                        String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  providerUserId            String                  @unique @db.Uuid
+  loginId                   String                  @db.VarChar(12)
+  normalizedLoginId         String                  @unique @db.VarChar(12)
+  normalizedEmail           String                  @unique @db.VarChar(320)
+  displayName               String                  @db.VarChar(160)
+  status                    UserStatus              @default(PROVISIONING)
+  mustChangePassword        Boolean                 @default(false)
+  disabledAt                DateTime?               @db.Timestamptz(6)
+  createdAt                 DateTime                @default(now()) @db.Timestamptz(6)
+  updatedAt                 DateTime                @updatedAt @db.Timestamptz(6)
+  staffGrants               StaffGrant[]            @relation("GrantUser")
+  issuedStaffGrants         StaffGrant[]            @relation("GrantIssuer")
+  portalAccess              PortalAccess?           @relation("PortalUser")
+  issuedPortalAccess        PortalAccess[]          @relation("PortalIssuer")
+  provisioningOperations    ProvisioningOperation[] @relation("ProvisioningActor")
+  responsibleBudgets        Budget[]                @relation("BudgetResponsible")
+  createdOrders             Order[]                 @relation("OrderCreator")
+  createdPurchaseReceipts   PurchaseReceipt[]       @relation("PurchaseReceiptCreator")
+  createdFinancialDocuments FinancialDocument[]     @relation("FinancialDocumentCreator")
+  createdEntries            JournalEntry[]          @relation("EntryCreator")
+  commandOperations         CommandOperation[]      @relation("CommandActor")
+  auditEvents               AuditEvent[]            @relation("AuditActor")
 
   @@index([status])
   @@map("application_users")
@@ -246,26 +263,28 @@ model ProvisioningOperation {
 }
 
 model Contact {
-  id           String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  businessId   String        @db.Uuid
-  kind         ContactKind
-  name         String        @db.VarChar(160)
-  email        String?       @db.VarChar(320)
-  mobile       String?       @db.VarChar(32)
-  street       String?       @db.VarChar(240)
-  city         String?       @db.VarChar(100)
-  state        String?       @db.VarChar(100)
-  pincode      String?       @db.VarChar(16)
-  imageAssetId String?       @unique @db.Uuid
-  revision     Int           @default(1)
-  archivedAt   DateTime?     @db.Timestamptz(6)
-  createdAt    DateTime      @default(now()) @db.Timestamptz(6)
-  updatedAt    DateTime      @updatedAt @db.Timestamptz(6)
-  business     Business      @relation(fields: [businessId], references: [id], onDelete: Restrict)
-  imageAsset   FileAsset?    @relation("ContactImage", fields: [imageAssetId], references: [id], onDelete: SetNull)
-  portalAccess PortalAccess?
-  journalItems JournalItem[]
-  orders       Order[]
+  id                 String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  businessId         String              @db.Uuid
+  kind               ContactKind
+  name               String              @db.VarChar(160)
+  email              String?             @db.VarChar(320)
+  mobile             String?             @db.VarChar(32)
+  street             String?             @db.VarChar(240)
+  city               String?             @db.VarChar(100)
+  state              String?             @db.VarChar(100)
+  pincode            String?             @db.VarChar(16)
+  imageAssetId       String?             @unique @db.Uuid
+  revision           Int                 @default(1)
+  archivedAt         DateTime?           @db.Timestamptz(6)
+  createdAt          DateTime            @default(now()) @db.Timestamptz(6)
+  updatedAt          DateTime            @updatedAt @db.Timestamptz(6)
+  business           Business            @relation(fields: [businessId], references: [id], onDelete: Restrict)
+  imageAsset         FileAsset?          @relation("ContactImage", fields: [imageAssetId], references: [id], onDelete: SetNull)
+  portalAccess       PortalAccess?
+  journalItems       JournalItem[]
+  orders             Order[]
+  purchaseReceipts   PurchaseReceipt[]
+  financialDocuments FinancialDocument[]
 
   @@index([businessId, kind, archivedAt])
   @@index([businessId, name])
@@ -287,21 +306,24 @@ model ProductCategory {
 }
 
 model Product {
-  id           String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  businessId   String          @db.Uuid
-  categoryId   String          @db.Uuid
-  name         String          @db.VarChar(160)
-  sku          String?         @db.VarChar(64)
-  kind         ProductKind
-  salesPrice   Decimal         @db.Decimal(20, 4)
-  purchaseCost Decimal         @db.Decimal(20, 4)
-  revision     Int             @default(1)
-  archivedAt   DateTime?       @db.Timestamptz(6)
-  createdAt    DateTime        @default(now()) @db.Timestamptz(6)
-  updatedAt    DateTime        @updatedAt @db.Timestamptz(6)
-  business     Business        @relation(fields: [businessId], references: [id], onDelete: Restrict)
-  category     ProductCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
-  orderLines   OrderLine[]
+  id                     String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  businessId             String                  @db.Uuid
+  categoryId             String                  @db.Uuid
+  name                   String                  @db.VarChar(160)
+  sku                    String?                 @db.VarChar(64)
+  kind                   ProductKind
+  salesPrice             Decimal                 @db.Decimal(20, 4)
+  purchaseCost           Decimal                 @db.Decimal(20, 4)
+  revision               Int                     @default(1)
+  archivedAt             DateTime?               @db.Timestamptz(6)
+  createdAt              DateTime                @default(now()) @db.Timestamptz(6)
+  updatedAt              DateTime                @updatedAt @db.Timestamptz(6)
+  business               Business                @relation(fields: [businessId], references: [id], onDelete: Restrict)
+  category               ProductCategory         @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  orderLines             OrderLine[]
+  purchaseReceiptLines   PurchaseReceiptLine[]
+  inventoryMovements     InventoryMovement[]
+  financialDocumentLines FinancialDocumentLine[]
 
   @@unique([businessId, sku])
   @@index([businessId, kind, archivedAt])
@@ -309,22 +331,24 @@ model Product {
 }
 
 model Order {
-  id          String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  businessId  String          @db.Uuid
-  kind        OrderKind
-  contactId   String          @db.Uuid
-  number      String          @db.VarChar(40)
-  orderDate   DateTime        @db.Date
-  state       OrderState      @default(DRAFT)
-  total       Decimal         @db.Decimal(20, 2)
-  revision    Int             @default(1)
-  createdById String          @db.Uuid
-  createdAt   DateTime        @default(now()) @db.Timestamptz(6)
-  updatedAt   DateTime        @updatedAt @db.Timestamptz(6)
-  business    Business        @relation(fields: [businessId], references: [id], onDelete: Restrict)
-  contact     Contact         @relation(fields: [contactId], references: [id], onDelete: Restrict)
-  createdBy   ApplicationUser @relation("OrderCreator", fields: [createdById], references: [id], onDelete: Restrict)
-  lines       OrderLine[]
+  id                 String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  businessId         String              @db.Uuid
+  kind               OrderKind
+  contactId          String              @db.Uuid
+  number             String              @db.VarChar(40)
+  orderDate          DateTime            @db.Date
+  state              OrderState          @default(DRAFT)
+  total              Decimal             @db.Decimal(20, 2)
+  revision           Int                 @default(1)
+  createdById        String              @db.Uuid
+  createdAt          DateTime            @default(now()) @db.Timestamptz(6)
+  updatedAt          DateTime            @updatedAt @db.Timestamptz(6)
+  business           Business            @relation(fields: [businessId], references: [id], onDelete: Restrict)
+  contact            Contact             @relation(fields: [contactId], references: [id], onDelete: Restrict)
+  createdBy          ApplicationUser     @relation("OrderCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  lines              OrderLine[]
+  purchaseReceipt    PurchaseReceipt?
+  financialDocuments FinancialDocument[]
 
   @@unique([businessId, kind, number])
   @@index([businessId, kind, state, orderDate])
@@ -333,20 +357,148 @@ model Order {
 }
 
 model OrderLine {
-  id                  String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  orderId             String  @db.Uuid
-  productId           String  @db.Uuid
-  productNameSnapshot String  @db.VarChar(160)
-  quantity            Decimal @db.Decimal(16, 4)
-  unitPriceSnapshot   Decimal @db.Decimal(20, 4)
-  lineTotal           Decimal @db.Decimal(20, 2)
-  position            Int
-  order               Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  product             Product @relation(fields: [productId], references: [id], onDelete: Restrict)
+  id                     String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orderId                String                  @db.Uuid
+  productId              String                  @db.Uuid
+  productNameSnapshot    String                  @db.VarChar(160)
+  quantity               Decimal                 @db.Decimal(16, 4)
+  unitPriceSnapshot      Decimal                 @db.Decimal(20, 4)
+  lineTotal              Decimal                 @db.Decimal(20, 2)
+  position               Int
+  order                  Order                   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product                Product                 @relation(fields: [productId], references: [id], onDelete: Restrict)
+  purchaseReceiptLine    PurchaseReceiptLine?
+  financialDocumentLines FinancialDocumentLine[]
 
   @@unique([orderId, position])
   @@index([productId])
   @@map("order_lines")
+}
+
+model PurchaseReceipt {
+  id                        String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  businessId                String                @db.Uuid
+  orderId                   String                @unique @db.Uuid
+  contactId                 String                @db.Uuid
+  number                    String                @db.VarChar(40)
+  receiptDate               DateTime              @db.Date
+  sourceOrderNumberSnapshot String                @db.VarChar(40)
+  sourceOrderDateSnapshot   DateTime              @db.Date
+  contactNameSnapshot       String                @db.VarChar(160)
+  createdById               String                @db.Uuid
+  createdAt                 DateTime              @default(now()) @db.Timestamptz(6)
+  business                  Business              @relation(fields: [businessId], references: [id], onDelete: Restrict)
+  order                     Order                 @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  contact                   Contact               @relation(fields: [contactId], references: [id], onDelete: Restrict)
+  createdBy                 ApplicationUser       @relation("PurchaseReceiptCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  lines                     PurchaseReceiptLine[]
+
+  @@unique([businessId, number])
+  @@index([businessId, receiptDate])
+  @@index([contactId])
+  @@map("purchase_receipts")
+}
+
+model PurchaseReceiptLine {
+  id                  String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  receiptId           String             @db.Uuid
+  sourceOrderLineId   String             @unique @db.Uuid
+  productId           String             @db.Uuid
+  productNameSnapshot String             @db.VarChar(160)
+  productKindSnapshot ProductKind
+  quantity            Decimal            @db.Decimal(16, 4)
+  position            Int
+  receipt             PurchaseReceipt    @relation(fields: [receiptId], references: [id], onDelete: Restrict)
+  sourceOrderLine     OrderLine          @relation(fields: [sourceOrderLineId], references: [id], onDelete: Restrict)
+  product             Product            @relation(fields: [productId], references: [id], onDelete: Restrict)
+  inventoryMovement   InventoryMovement?
+
+  @@unique([receiptId, position])
+  @@index([productId])
+  @@map("purchase_receipt_lines")
+}
+
+model InventoryMovement {
+  id                    String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  businessId            String              @db.Uuid
+  productId             String              @db.Uuid
+  purchaseReceiptLineId String              @unique @db.Uuid
+  movementDate          DateTime            @db.Date
+  quantityDelta         Decimal             @db.Decimal(16, 4)
+  productNameSnapshot   String              @db.VarChar(160)
+  createdAt             DateTime            @default(now()) @db.Timestamptz(6)
+  business              Business            @relation(fields: [businessId], references: [id], onDelete: Restrict)
+  product               Product             @relation(fields: [productId], references: [id], onDelete: Restrict)
+  purchaseReceiptLine   PurchaseReceiptLine @relation(fields: [purchaseReceiptLineId], references: [id], onDelete: Restrict)
+
+  @@index([businessId, productId, movementDate])
+  @@map("inventory_movements")
+}
+
+model FinancialDocument {
+  id                        String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  businessId                String                  @db.Uuid
+  kind                      FinancialDocumentKind
+  contactId                 String                  @db.Uuid
+  sourceOrderId             String                  @db.Uuid
+  number                    String                  @db.VarChar(40)
+  documentDate              DateTime                @db.Date
+  dueDate                   DateTime                @db.Date
+  externalReference         String?                 @db.VarChar(160)
+  contactNameSnapshot       String                  @db.VarChar(160)
+  sourceOrderNumberSnapshot String                  @db.VarChar(40)
+  state                     FinancialDocumentState  @default(DRAFT)
+  netTotal                  Decimal                 @db.Decimal(20, 2)
+  taxTotal                  Decimal                 @db.Decimal(20, 2)
+  total                     Decimal                 @db.Decimal(20, 2)
+  revision                  Int                     @default(1)
+  journalEntryId            String?                 @unique @db.Uuid
+  createdById               String                  @db.Uuid
+  createdAt                 DateTime                @default(now()) @db.Timestamptz(6)
+  updatedAt                 DateTime                @updatedAt @db.Timestamptz(6)
+  business                  Business                @relation(fields: [businessId], references: [id], onDelete: Restrict)
+  contact                   Contact                 @relation(fields: [contactId], references: [id], onDelete: Restrict)
+  sourceOrder               Order                   @relation(fields: [sourceOrderId], references: [id], onDelete: Restrict)
+  journalEntry              JournalEntry?           @relation(fields: [journalEntryId], references: [id], onDelete: Restrict)
+  createdBy                 ApplicationUser         @relation("FinancialDocumentCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  lines                     FinancialDocumentLine[]
+
+  @@unique([businessId, kind, number])
+  @@index([businessId, kind, state, documentDate])
+  @@index([contactId])
+  @@index([sourceOrderId])
+  @@map("financial_documents")
+}
+
+model FinancialDocumentLine {
+  id                  String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  documentId          String            @db.Uuid
+  sourceOrderLineId   String            @db.Uuid
+  productId           String            @db.Uuid
+  productNameSnapshot String            @db.VarChar(160)
+  quantity            Decimal           @db.Decimal(16, 4)
+  unitPriceSnapshot   Decimal           @db.Decimal(20, 4)
+  lineNetTotal        Decimal           @db.Decimal(20, 2)
+  taxId               String?           @db.Uuid
+  taxNameSnapshot     String?           @db.VarChar(120)
+  taxRateSnapshot     Decimal?          @db.Decimal(7, 4)
+  taxRevisionSnapshot Int?
+  taxAmount           Decimal           @default(0) @db.Decimal(20, 2)
+  lineTotal           Decimal           @db.Decimal(20, 2)
+  analyticAccountId   String?           @db.Uuid
+  position            Int
+  document            FinancialDocument @relation(fields: [documentId], references: [id], onDelete: Restrict)
+  sourceOrderLine     OrderLine         @relation(fields: [sourceOrderLineId], references: [id], onDelete: Restrict)
+  product             Product           @relation(fields: [productId], references: [id], onDelete: Restrict)
+  tax                 Tax?              @relation(fields: [taxId], references: [id], onDelete: Restrict)
+  analyticAccount     AnalyticAccount?  @relation(fields: [analyticAccountId], references: [id], onDelete: Restrict)
+
+  @@unique([documentId, position])
+  @@unique([documentId, sourceOrderLineId])
+  @@index([productId])
+  @@index([taxId])
+  @@index([analyticAccountId])
+  @@map("financial_document_lines")
 }
 
 model LedgerAccount {
@@ -401,20 +553,21 @@ model Journal {
 }
 
 model Tax {
-  id              String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  businessId      String         @db.Uuid
-  name            String         @db.VarChar(120)
-  rate            Decimal        @db.Decimal(7, 4)
-  scope           TaxScope
-  inputAccountId  String?        @db.Uuid
-  outputAccountId String?        @db.Uuid
-  revision        Int            @default(1)
-  archivedAt      DateTime?      @db.Timestamptz(6)
-  createdAt       DateTime       @default(now()) @db.Timestamptz(6)
-  updatedAt       DateTime       @updatedAt @db.Timestamptz(6)
-  business        Business       @relation(fields: [businessId], references: [id], onDelete: Restrict)
-  inputAccount    LedgerAccount? @relation("TaxInputAccount", fields: [inputAccountId], references: [id], onDelete: Restrict)
-  outputAccount   LedgerAccount? @relation("TaxOutputAccount", fields: [outputAccountId], references: [id], onDelete: Restrict)
+  id                     String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  businessId             String                  @db.Uuid
+  name                   String                  @db.VarChar(120)
+  rate                   Decimal                 @db.Decimal(7, 4)
+  scope                  TaxScope
+  inputAccountId         String?                 @db.Uuid
+  outputAccountId        String?                 @db.Uuid
+  revision               Int                     @default(1)
+  archivedAt             DateTime?               @db.Timestamptz(6)
+  createdAt              DateTime                @default(now()) @db.Timestamptz(6)
+  updatedAt              DateTime                @updatedAt @db.Timestamptz(6)
+  business               Business                @relation(fields: [businessId], references: [id], onDelete: Restrict)
+  inputAccount           LedgerAccount?          @relation("TaxInputAccount", fields: [inputAccountId], references: [id], onDelete: Restrict)
+  outputAccount          LedgerAccount?          @relation("TaxOutputAccount", fields: [outputAccountId], references: [id], onDelete: Restrict)
+  financialDocumentLines FinancialDocumentLine[]
 
   @@unique([businessId, name])
   @@index([businessId, archivedAt])
@@ -422,17 +575,18 @@ model Tax {
 }
 
 model AnalyticAccount {
-  id           String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  businessId   String        @db.Uuid
-  name         String        @db.VarChar(120)
-  type         AnalyticType
-  revision     Int           @default(1)
-  archivedAt   DateTime?     @db.Timestamptz(6)
-  createdAt    DateTime      @default(now()) @db.Timestamptz(6)
-  updatedAt    DateTime      @updatedAt @db.Timestamptz(6)
-  business     Business      @relation(fields: [businessId], references: [id], onDelete: Restrict)
-  budgetLines  BudgetLine[]
-  journalItems JournalItem[]
+  id                     String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  businessId             String                  @db.Uuid
+  name                   String                  @db.VarChar(120)
+  type                   AnalyticType
+  revision               Int                     @default(1)
+  archivedAt             DateTime?               @db.Timestamptz(6)
+  createdAt              DateTime                @default(now()) @db.Timestamptz(6)
+  updatedAt              DateTime                @updatedAt @db.Timestamptz(6)
+  business               Business                @relation(fields: [businessId], references: [id], onDelete: Restrict)
+  budgetLines            BudgetLine[]
+  journalItems           JournalItem[]
+  financialDocumentLines FinancialDocumentLine[]
 
   @@unique([businessId, name])
   @@index([businessId, type, archivedAt])
@@ -492,25 +646,26 @@ model FileAsset {
 }
 
 model JournalEntry {
-  id                String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  businessId        String          @db.Uuid
-  journalId         String          @db.Uuid
-  postingDate       DateTime        @db.Date
-  reference         String          @db.VarChar(160)
-  state             EntryState      @default(DRAFT)
+  id                String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  businessId        String             @db.Uuid
+  journalId         String             @db.Uuid
+  postingDate       DateTime           @db.Date
+  reference         String             @db.VarChar(160)
+  state             EntryState         @default(DRAFT)
   source            EntrySource
-  sourceReference   String?         @db.Uuid
-  reversalOfEntryId String?         @unique @db.Uuid
-  createdById       String          @db.Uuid
-  postedAt          DateTime?       @db.Timestamptz(6)
-  createdAt         DateTime        @default(now()) @db.Timestamptz(6)
-  updatedAt         DateTime        @updatedAt @db.Timestamptz(6)
-  business          Business        @relation(fields: [businessId], references: [id], onDelete: Restrict)
-  journal           Journal         @relation(fields: [journalId], references: [id], onDelete: Restrict)
-  createdBy         ApplicationUser @relation("EntryCreator", fields: [createdById], references: [id], onDelete: Restrict)
-  reversalOf        JournalEntry?   @relation("EntryReversal", fields: [reversalOfEntryId], references: [id], onDelete: Restrict)
-  reversedBy        JournalEntry?   @relation("EntryReversal")
+  sourceReference   String?            @db.Uuid
+  reversalOfEntryId String?            @unique @db.Uuid
+  createdById       String             @db.Uuid
+  postedAt          DateTime?          @db.Timestamptz(6)
+  createdAt         DateTime           @default(now()) @db.Timestamptz(6)
+  updatedAt         DateTime           @updatedAt @db.Timestamptz(6)
+  business          Business           @relation(fields: [businessId], references: [id], onDelete: Restrict)
+  journal           Journal            @relation(fields: [journalId], references: [id], onDelete: Restrict)
+  createdBy         ApplicationUser    @relation("EntryCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  reversalOf        JournalEntry?      @relation("EntryReversal", fields: [reversalOfEntryId], references: [id], onDelete: Restrict)
+  reversedBy        JournalEntry?      @relation("EntryReversal")
   items             JournalItem[]
+  financialDocument FinancialDocument?
 
   @@index([businessId, postingDate, state])
   @@index([journalId, postingDate])

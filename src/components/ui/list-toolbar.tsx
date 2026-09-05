@@ -7,6 +7,7 @@ import { cn } from '@/lib/cn'
 
 export function ListToolbar({
 	action,
+	hasSearch = true,
 	searchName = 'q',
 	searchLabel = 'Search',
 	searchPlaceholder,
@@ -15,6 +16,7 @@ export function ListToolbar({
 	children
 }: {
 	action: string
+	hasSearch?: boolean
 	searchName?: string
 	searchLabel?: string
 	searchPlaceholder?: string
@@ -30,25 +32,27 @@ export function ListToolbar({
 			aria-label={searchLabel}
 			className="flex flex-col gap-3 rounded-xl border border-border bg-surface p-4 sm:flex-row sm:flex-wrap sm:items-end"
 		>
-			<div className="flex min-w-0 flex-1 flex-col gap-1.5 sm:min-w-56">
-				<label htmlFor="list-toolbar-search" className="text-sm font-medium text-foreground">
-					{searchLabel}
-				</label>
-				<span className="relative block">
-					<Search
-						aria-hidden="true"
-						className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
-					/>
-					<input
-						id="list-toolbar-search"
-						type="search"
-						name={searchName}
-						defaultValue={searchDefaultValue}
-						placeholder={searchPlaceholder}
-						className={cn(fieldControlClassName, 'pl-9')}
-					/>
-				</span>
-			</div>
+			{hasSearch && (
+				<div className="flex min-w-0 flex-1 flex-col gap-1.5 sm:min-w-56">
+					<label htmlFor="list-toolbar-search" className="text-sm font-medium text-foreground">
+						{searchLabel}
+					</label>
+					<span className="relative block">
+						<Search
+							aria-hidden="true"
+							className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
+						/>
+						<input
+							id="list-toolbar-search"
+							type="search"
+							name={searchName}
+							defaultValue={searchDefaultValue}
+							placeholder={searchPlaceholder}
+							className={cn(fieldControlClassName, 'pl-9')}
+						/>
+					</span>
+				</div>
+			)}
 
 			{children}
 

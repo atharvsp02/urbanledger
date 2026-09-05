@@ -7,37 +7,57 @@
 		"node": ">=22.13.0 <23"
 	},
 	"scripts": {
+		"postinstall": "prisma generate",
 		"dev": "next dev",
 		"build": "next build",
 		"start": "next start",
 		"local:start": "node scripts/local-services.mjs start",
 		"local:stop": "node scripts/local-services.mjs stop",
 		"local:status": "node scripts/local-services.mjs status",
+		"local:seed": "prisma db seed",
+		"local:reset": "node scripts/local-services.mjs reset",
+		"db:generate": "prisma generate",
+		"db:migrate": "prisma migrate dev",
+		"db:deploy": "prisma migrate deploy",
+		"db:validate": "prisma validate",
 		"lint": "eslint . --max-warnings=0",
 		"typecheck": "next typegen && tsc --noEmit",
 		"format": "prettier --write .",
 		"format:check": "prettier --check .",
-		"check": "pnpm lint && pnpm typecheck && pnpm format:check"
+		"check": "pnpm lint && pnpm typecheck && pnpm format:check",
+		"test:e2e": "playwright test"
 	},
 	"dependencies": {
+		"@prisma/adapter-pg": "7.10.0",
+		"@prisma/client": "7.10.0",
+		"@supabase/ssr": "0.12.6",
+		"@supabase/supabase-js": "2.115.0",
 		"class-variance-authority": "0.7.1",
 		"clsx": "2.1.1",
 		"lucide-react": "1.31.0",
 		"next": "16.3.4",
+		"pg": "8.23.0",
 		"react": "19.2.8",
 		"react-dom": "19.2.8",
-		"tailwind-merge": "3.6.0"
+		"server-only": "0.0.1",
+		"tailwind-merge": "3.6.0",
+		"zod": "4.5.4"
 	},
 	"devDependencies": {
+		"@playwright/test": "1.63.0",
 		"@tailwindcss/postcss": "4.3.3",
 		"@types/node": "22.20.1",
+		"@types/pg": "8.23.1",
 		"@types/react": "19.2.18",
 		"@types/react-dom": "19.2.7",
+		"dotenv": "17.4.2",
 		"eslint": "9.39.5",
 		"eslint-config-next": "16.3.4",
 		"prettier": "3.9.6",
+		"prisma": "7.10.0",
 		"supabase": "2.116.0",
 		"tailwindcss": "4.3.3",
+		"tsx": "4.23.1",
 		"typescript": "5.9.3"
 	}
 }

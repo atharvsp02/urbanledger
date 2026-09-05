@@ -14,6 +14,7 @@ export default defineConfig([
 		'.worktrees/**',
 		'inspiration/**',
 		'docs/**',
+		'src/generated/prisma/**',
 		'next-env.d.ts'
 	])
 ])

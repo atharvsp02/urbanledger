@@ -13,6 +13,7 @@ dist/
 coverage/
 *.tsbuildinfo
 next-env.d.ts
+/src/generated/prisma/
 
 .env*
 !.env.example
@@ -26,6 +27,7 @@ test-results/
 playwright-report/
 blob-report/
 playwright/.cache/
+playwright/.auth/
 
 .DS_Store
 npm-debug.log*

@@ -11,6 +11,9 @@ dist/
 coverage/
 next-env.d.ts
 pnpm-lock.yaml
+src/generated/prisma/
+prisma/migrations/
+prisma/schema.prisma
 .env*
 .vercel/
 .claude-logs/

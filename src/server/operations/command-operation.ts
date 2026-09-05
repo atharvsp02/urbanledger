@@ -34,7 +34,11 @@ export async function executeIdempotentOperation<T>(input: {
 	requestHash: string
 	parseStoredResult: (value: unknown) => T | null
 	resourceId: (result: T) => string
-	command: (transaction: CommandTransaction, accountingLockDate: Date | null) => Promise<T>
+	command: (
+		transaction: CommandTransaction,
+		accountingLockDate: Date | null,
+		businessTimezone: string
+	) => Promise<T>
 }) {
 	const database = getPrisma()
 
@@ -88,7 +92,11 @@ export async function executeIdempotentOperation<T>(input: {
 						}
 					})
 
-					const result = await input.command(transaction, business.accountingLockDate)
+					const result = await input.command(
+						transaction,
+						business.accountingLockDate,
+						business.timezone
+					)
 					await transaction.commandOperation.update({
 						where: {
 							businessId_operationKey: {

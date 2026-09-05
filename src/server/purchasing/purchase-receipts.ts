@@ -22,6 +22,7 @@ import { getPrisma } from '@/server/db/prisma'
 import { allocateDocumentNumber } from '@/server/documents/sequences'
 import { ApplicationError } from '@/server/errors/application-error'
 import { resolvePage } from '@/server/masters/pagination'
+import { assertNotFutureBusinessDate } from '@/server/business/dates'
 import {
 	canonicalRequestHash,
 	executeIdempotentOperation
@@ -63,6 +64,13 @@ function businessDate(value: string) {
 	return new Date(`${value}T00:00:00.000Z`)
 }
 
+function fulfillmentType(kinds: Array<'GOODS' | 'SERVICE' | 'COMBO'>) {
+	const hasInventory = kinds.some((kind) => kind !== 'SERVICE')
+	const hasService = kinds.some((kind) => kind === 'SERVICE')
+	if (hasInventory && hasService) return 'MIXED' as const
+	return hasService ? ('SERVICE_ACCEPTANCE' as const) : ('GOODS_RECEIPT' as const)
+}
+
 async function loadPurchaseReceiptDetail(
 	transaction: PurchaseTransaction,
 	businessId: string,
@@ -87,6 +95,7 @@ async function loadPurchaseReceiptDetail(
 		id: receipt.id,
 		receiptNumber: receipt.number,
 		receiptDate: dateOnly(receipt.receiptDate),
+		fulfillmentType: fulfillmentType(receipt.lines.map((line) => line.productKindSnapshot)),
 		sourceOrder: {
 			id: receipt.orderId,
 			orderNumber: receipt.sourceOrderNumberSnapshot,
@@ -137,7 +146,8 @@ export async function receivePurchaseOrder(
 				return stored.success ? stored.data : null
 			},
 			resourceId: (receipt) => receipt.id,
-			command: async (transaction) => {
+			command: async (transaction, _accountingLockDate, businessTimezone) => {
+				assertNotFutureBusinessDate(parsed.data.receiptDate, businessTimezone, 'Receipt date')
 				const order = await transaction.order.findFirst({
 					where: {
 						id: parsed.data.purchaseOrderId,
@@ -322,7 +332,10 @@ export async function listPurchaseReceipts(
 				const { page, lastPage } = resolvePage(parsed.data.page, parsed.data.pageSize, totalCount)
 				const receipts = await transaction.purchaseReceipt.findMany({
 					where,
-					include: { createdBy: { select: { id: true, displayName: true } } },
+					include: {
+						createdBy: { select: { id: true, displayName: true } },
+						lines: { select: { productKindSnapshot: true } }
+					},
 					orderBy: [{ receiptDate: 'desc' }, { id: 'asc' }],
 					skip: (page - 1) * parsed.data.pageSize,
 					take: parsed.data.pageSize
@@ -333,6 +346,7 @@ export async function listPurchaseReceipts(
 						id: receipt.id,
 						receiptNumber: receipt.number,
 						receiptDate: dateOnly(receipt.receiptDate),
+						fulfillmentType: fulfillmentType(receipt.lines.map((line) => line.productKindSnapshot)),
 						sourceOrder: {
 							id: receipt.orderId,
 							orderNumber: receipt.sourceOrderNumberSnapshot,

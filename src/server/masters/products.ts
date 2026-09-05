@@ -117,23 +117,66 @@ export async function createProduct(input: ProductInput) {
 export async function updateProduct(productId: string, revision: number, input: ProductInput) {
 	const actor = await requireActor('masters:update')
 	const parsed = productInputSchema.parse(input)
-	await assertCategoryUsable(actor.businessId, parsed.categoryId)
 	const prisma = getPrisma()
 
-	const result = await prisma.product.updateMany({
-		where: { id: productId, businessId: actor.businessId, revision },
-		data: { ...parsed, revision: { increment: 1 } }
-	})
+	return prisma.$transaction(
+		async (transaction) => {
+			const product = await transaction.product.findFirst({
+				where: { id: productId, businessId: actor.businessId },
+				select: { id: true, kind: true, revision: true }
+			})
+			if (!product) throw new ApplicationError('NOT_FOUND', 'This product does not exist.')
+			if (product.revision !== revision) {
+				throw new ApplicationError(
+					'STALE_REVISION',
+					'This product changed while you were editing. Reload it and review the current values.'
+				)
+			}
 
-	if (result.count === 0) {
-		await assertProductExists(prisma, productId, actor.businessId)
-		throw new ApplicationError(
-			'STALE_REVISION',
-			'This product changed while you were editing. Reload it and review the current values.'
-		)
-	}
+			const category = await transaction.productCategory.findFirst({
+				where: { id: parsed.categoryId, businessId: actor.businessId },
+				select: { archivedAt: true }
+			})
+			if (!category) {
+				throw new ApplicationError('VALIDATION_ERROR', 'Check the highlighted fields.', {
+					categoryId: ['Choose an available category.']
+				})
+			}
+			if (category.archivedAt) {
+				throw new ApplicationError('ARCHIVED_DEPENDENCY', 'That category is archived.', {
+					categoryId: ['Choose an active category.']
+				})
+			}
 
-	return { id: productId }
+			if (product.kind !== parsed.kind) {
+				const [orderLineCount, movementCount, documentLineCount] = await Promise.all([
+					transaction.orderLine.count({ where: { productId } }),
+					transaction.inventoryMovement.count({ where: { productId } }),
+					transaction.financialDocumentLine.count({ where: { productId } })
+				])
+				if (orderLineCount + movementCount + documentLineCount > 0) {
+					throw new ApplicationError(
+						'INVALID_STATE',
+						'Product kind cannot change after the product has transaction history.'
+					)
+				}
+			}
+
+			const result = await transaction.product.updateMany({
+				where: { id: productId, businessId: actor.businessId, revision },
+				data: { ...parsed, revision: { increment: 1 } }
+			})
+			if (result.count === 0) {
+				throw new ApplicationError(
+					'STALE_REVISION',
+					'This product changed while you were editing. Reload it and review the current values.'
+				)
+			}
+
+			return { id: productId }
+		},
+		{ isolationLevel: 'Serializable' }
+	)
 }
 
 export async function setProductArchived(productId: string, revision: number, isArchived: boolean) {
@@ -175,7 +218,7 @@ export async function listSelectableProducts() {
 	const actor = await requireActor('masters:read')
 	const rows = await getPrisma().product.findMany({
 		where: { businessId: actor.businessId, archivedAt: null },
-		select: { id: true, name: true, sku: true, purchaseCost: true },
+		select: { id: true, name: true, sku: true, kind: true, purchaseCost: true },
 		orderBy: [{ name: 'asc' }, { id: 'asc' }]
 	})
 
@@ -183,6 +226,7 @@ export async function listSelectableProducts() {
 		id: product.id,
 		name: product.name,
 		sku: product.sku,
+		kind: product.kind,
 		purchaseCost: decimalToString(product.purchaseCost)
 	}))
 }

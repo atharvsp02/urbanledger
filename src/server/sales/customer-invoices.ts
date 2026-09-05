@@ -35,6 +35,7 @@ import {
 	type PostedJournalLine
 } from '@/server/accounting/posting-kernel'
 import { getPrisma } from '@/server/db/prisma'
+import { assertNotFutureBusinessDate } from '@/server/business/dates'
 import { allocateDocumentNumber } from '@/server/documents/sequences'
 import { ApplicationError } from '@/server/errors/application-error'
 import { resolvePage } from '@/server/masters/pagination'
@@ -481,7 +482,7 @@ export async function postCustomerInvoice(
 				return stored.success ? stored.data : null
 			},
 			resourceId: (invoice) => invoice.id,
-			command: async (transaction, accountingLockDate) => {
+			command: async (transaction, accountingLockDate, businessTimezone) => {
 				const invoice = await transaction.financialDocument.findFirst({
 					where: {
 						id: parsed.data.customerInvoiceId,
@@ -505,6 +506,11 @@ export async function postCustomerInvoice(
 					)
 				}
 				assertAccountingDateUnlocked(dateOnly(invoice.documentDate), accountingLockDate)
+				assertNotFutureBusinessDate(
+					dateOnly(invoice.documentDate),
+					businessTimezone,
+					'Invoice posting date'
+				)
 				if (
 					invoice.contact.businessId !== actor.businessId ||
 					invoice.contact.archivedAt ||

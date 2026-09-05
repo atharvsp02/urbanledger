@@ -28,7 +28,7 @@ export async function requireCurrentAccountingActor(
 				disabledAt: null
 			}
 		},
-		select: { business: { select: { accountingLockDate: true } } }
+		select: { business: { select: { accountingLockDate: true, timezone: true } } }
 	})
 
 	if (!grant) {

@@ -44,6 +44,9 @@ export const purchaseReceiptDetailSchema = z.object({
 	id: z.uuid(),
 	receiptNumber: z.string(),
 	receiptDate: z.iso.date(),
+	fulfillmentType: z
+		.enum(['GOODS_RECEIPT', 'SERVICE_ACCEPTANCE', 'MIXED'])
+		.default('GOODS_RECEIPT'),
 	sourceOrder: z.object({
 		id: z.uuid(),
 		orderNumber: z.string(),

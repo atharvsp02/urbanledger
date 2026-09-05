@@ -28,6 +28,7 @@ import {
 	commitPostedJournalEntry
 } from '@/server/accounting/posting-kernel'
 import { getPrisma } from '@/server/db/prisma'
+import { assertNotFutureBusinessDate } from '@/server/business/dates'
 import { ApplicationError } from '@/server/errors/application-error'
 
 type PostingSource = 'MANUAL' | 'OPENING'
@@ -373,7 +374,8 @@ async function executeIdempotentCommand(
 	hash: string,
 	command: (
 		transaction: AccountingTransaction,
-		accountingLockDate: Date | null
+		accountingLockDate: Date | null,
+		businessTimezone: string
 	) => Promise<JournalPostingResult>
 ): Promise<JournalPostingResult> {
 	const database = getPrisma()
@@ -425,7 +427,7 @@ async function executeIdempotentCommand(
 						}
 					})
 
-					const result = await command(transaction, business.accountingLockDate)
+					const result = await command(transaction, business.accountingLockDate, business.timezone)
 
 					await transaction.commandOperation.update({
 						where: {
@@ -483,7 +485,8 @@ async function postJournal(
 			parsed.data.operationKey,
 			operationNames[source],
 			hash,
-			async (transaction, accountingLockDate) => {
+			async (transaction, accountingLockDate, businessTimezone) => {
+				assertNotFutureBusinessDate(parsed.data.postingDate, businessTimezone, 'Posting date')
 				const validated = await loadPostingDependencies(
 					transaction,
 					actor,
@@ -541,8 +544,9 @@ export async function reverseJournalEntry(
 			parsed.data.operationKey,
 			operationNames.REVERSAL,
 			hash,
-			async (transaction, accountingLockDate) => {
+			async (transaction, accountingLockDate, businessTimezone) => {
 				assertAccountingDateUnlocked(parsed.data.postingDate, accountingLockDate)
+				assertNotFutureBusinessDate(parsed.data.postingDate, businessTimezone, 'Reversal date')
 
 				const original = await transaction.journalEntry.findFirst({
 					where: {
@@ -556,10 +560,10 @@ export async function reverseJournalEntry(
 					throw new ApplicationError('NOT_FOUND', 'The posted journal entry was not found.')
 				}
 
-				if (original.source === 'REVERSAL') {
+				if (original.source !== 'MANUAL' && original.source !== 'OPENING') {
 					throw new ApplicationError(
 						'INVALID_STATE',
-						'A reversal entry cannot be reversed directly.'
+						'Only Manual and Opening entries can be reversed from the journal.'
 					)
 				}
 

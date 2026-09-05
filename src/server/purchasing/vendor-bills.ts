@@ -23,7 +23,6 @@ import {
 } from '@/lib/contracts/vendor-bill'
 import { requireCurrentAccountingActor } from '@/server/accounting/authorize'
 import {
-	assertJournalAmountRange,
 	formatJournalAmount,
 	sumJournalAmounts,
 	zeroJournalAmount
@@ -35,6 +34,7 @@ import {
 	type PostedJournalLine
 } from '@/server/accounting/posting-kernel'
 import { getPrisma } from '@/server/db/prisma'
+import { assertNotFutureBusinessDate } from '@/server/business/dates'
 import { allocateDocumentNumber } from '@/server/documents/sequences'
 import { ApplicationError } from '@/server/errors/application-error'
 import { resolvePage } from '@/server/masters/pagination'
@@ -44,14 +44,6 @@ import {
 } from '@/server/operations/command-operation'
 
 type PurchaseTransaction = Prisma.TransactionClient
-
-type TaxDependency = {
-	id: string
-	name: string
-	rate: Prisma.Decimal
-	revision: number
-	inputAccountId: string
-}
 
 function validationFailure(error: z.ZodError): ActionResult<never> {
 	return {
@@ -85,12 +77,6 @@ function dateOnly(value: Date) {
 
 function businessDate(value: string) {
 	return new Date(`${value}T00:00:00.000Z`)
-}
-
-function calculateTaxAmount(netAmount: Prisma.Decimal, rate: Prisma.Decimal) {
-	const amount = new Prisma.Decimal(formatJournalAmount(netAmount.times(rate).div(100)))
-	assertJournalAmountRange(amount)
-	return amount
 }
 
 async function loadVendorBillDetail(
@@ -162,54 +148,6 @@ async function loadVendorBillDetail(
 			}
 		})
 	}
-}
-
-async function loadTaxDependencies(
-	transaction: PurchaseTransaction,
-	businessId: string,
-	taxIds: string[]
-) {
-	const taxes = await transaction.tax.findMany({
-		where: { id: { in: taxIds }, businessId },
-		include: { inputAccount: true }
-	})
-
-	if (taxes.length !== taxIds.length) {
-		throw new ApplicationError('NOT_FOUND', 'A selected purchase tax was not found.')
-	}
-
-	const dependencies = new Map<string, TaxDependency>()
-	for (const tax of taxes) {
-		if (tax.archivedAt) {
-			throw new ApplicationError('ARCHIVED_DEPENDENCY', 'Choose an active purchase tax.')
-		}
-		if (tax.scope !== 'PURCHASE' && tax.scope !== 'BOTH') {
-			throw new ApplicationError('INVALID_STATE', 'Choose a Purchase or Both tax.')
-		}
-		if (
-			!tax.inputAccountId ||
-			!tax.inputAccount ||
-			tax.inputAccount.businessId !== businessId ||
-			tax.inputAccount.archivedAt ||
-			tax.inputAccount.type !== 'ASSET' ||
-			tax.inputAccount.subtype !== 'INPUT_TAX'
-		) {
-			throw new ApplicationError(
-				'INVALID_STATE',
-				'The purchase tax requires an active Input Tax account.'
-			)
-		}
-
-		dependencies.set(tax.id, {
-			id: tax.id,
-			name: tax.name,
-			rate: tax.rate,
-			revision: tax.revision,
-			inputAccountId: tax.inputAccountId
-		})
-	}
-
-	return dependencies
 }
 
 async function loadAnalyticDependencies(
@@ -355,8 +293,8 @@ export async function createVendorBillFromPurchaseOrder(
 						externalReference: parsed.data.vendorReference ?? null,
 						contactNameSnapshot: order.contact.name,
 						sourceOrderNumberSnapshot: order.number,
-						netTotal: order.total,
-						taxTotal: '0.00',
+						netTotal: order.netTotal,
+						taxTotal: order.taxTotal,
 						total: order.total,
 						createdById: actor.userId
 					},
@@ -372,8 +310,14 @@ export async function createVendorBillFromPurchaseOrder(
 						quantity: line.quantity,
 						unitPriceSnapshot: line.unitPriceSnapshot,
 						lineNetTotal: line.lineTotal,
-						taxAmount: '0.00',
-						lineTotal: line.lineTotal,
+						taxId: line.taxId,
+						taxNameSnapshot: line.taxNameSnapshot,
+						taxRateSnapshot: line.taxRateSnapshot,
+						taxRevisionSnapshot: line.taxRevisionSnapshot,
+						taxAccountIdSnapshot: line.taxAccountIdSnapshot,
+						taxAmount: line.taxAmount,
+						lineTotal: line.grossTotal,
+						analyticAccountId: line.analyticAccountId,
 						position: line.position
 					}))
 				})
@@ -444,44 +388,19 @@ export async function updateDraftVendorBill(
 					)
 				}
 
-				const taxIds = [
-					...new Set(parsed.data.lines.flatMap((line) => (line.taxId ? [line.taxId] : [])))
-				]
-				const analyticIds = [
-					...new Set(
-						parsed.data.lines.flatMap((line) =>
-							line.analyticAccountId ? [line.analyticAccountId] : []
-						)
-					)
-				]
-				const taxes = await loadTaxDependencies(transaction, actor.businessId, taxIds)
-				await loadAnalyticDependencies(transaction, actor.businessId, analyticIds)
-				const taxAmounts: Prisma.Decimal[] = []
-
 				for (const line of bill.lines) {
 					const selection = selectionByLineId.get(line.id)!
-					const tax = selection.taxId ? taxes.get(selection.taxId) : null
-					const taxAmount = tax
-						? calculateTaxAmount(line.lineNetTotal, tax.rate)
-						: zeroJournalAmount()
-					taxAmounts.push(taxAmount)
-
-					await transaction.financialDocumentLine.update({
-						where: { id: line.id },
-						data: {
-							taxId: tax?.id ?? null,
-							taxNameSnapshot: tax?.name ?? null,
-							taxRateSnapshot: tax?.rate ?? null,
-							taxRevisionSnapshot: tax?.revision ?? null,
-							taxAccountIdSnapshot: tax?.inputAccountId ?? null,
-							taxAmount: formatJournalAmount(taxAmount),
-							lineTotal: formatJournalAmount(line.lineNetTotal.plus(taxAmount)),
-							analyticAccountId: selection.analyticAccountId
-						}
-					})
+					if (
+						selection.taxId !== line.taxId ||
+						selection.analyticAccountId !== line.analyticAccountId
+					) {
+						throw new ApplicationError(
+							'INVALID_STATE',
+							'Confirmed Purchase Order tax and analytic terms cannot be changed on the Vendor Bill.'
+						)
+					}
 				}
 
-				const taxTotal = sumJournalAmounts(taxAmounts)
 				const updated = await transaction.financialDocument.updateMany({
 					where: {
 						id: bill.id,
@@ -494,8 +413,6 @@ export async function updateDraftVendorBill(
 						documentDate: businessDate(parsed.data.billDate),
 						dueDate: businessDate(parsed.data.dueDate),
 						externalReference: parsed.data.vendorReference ?? null,
-						taxTotal: formatJournalAmount(taxTotal),
-						total: formatJournalAmount(bill.netTotal.plus(taxTotal)),
 						revision: { increment: 1 }
 					}
 				})
@@ -630,7 +547,7 @@ export async function postVendorBill(
 				return stored.success ? stored.data : null
 			},
 			resourceId: (bill) => bill.id,
-			command: async (transaction, accountingLockDate) => {
+			command: async (transaction, accountingLockDate, businessTimezone) => {
 				const bill = await transaction.financialDocument.findFirst({
 					where: {
 						id: parsed.data.vendorBillId,
@@ -650,6 +567,11 @@ export async function postVendorBill(
 					throw new ApplicationError('INVALID_STATE', 'Only a draft Vendor Bill can be posted.')
 				}
 				assertAccountingDateUnlocked(dateOnly(bill.documentDate), accountingLockDate)
+				assertNotFutureBusinessDate(
+					dateOnly(bill.documentDate),
+					businessTimezone,
+					'Bill posting date'
+				)
 
 				if (
 					bill.contact.businessId !== actor.businessId ||
@@ -694,17 +616,37 @@ export async function postVendorBill(
 					)
 				}
 
-				const taxIds = [...new Set(bill.lines.flatMap((line) => (line.taxId ? [line.taxId] : [])))]
 				const analyticIds = [
 					...new Set(
 						bill.lines.flatMap((line) => (line.analyticAccountId ? [line.analyticAccountId] : []))
 					)
 				]
-				const taxes = await loadTaxDependencies(transaction, actor.businessId, taxIds)
 				await loadAnalyticDependencies(transaction, actor.businessId, analyticIds)
+				const taxAccountIds = [
+					...new Set(
+						bill.lines.flatMap((line) =>
+							line.taxAccountIdSnapshot ? [line.taxAccountIdSnapshot] : []
+						)
+					)
+				]
+				const taxAccounts = await transaction.ledgerAccount.findMany({
+					where: { id: { in: taxAccountIds }, businessId: actor.businessId }
+				})
+				if (
+					taxAccounts.length !== taxAccountIds.length ||
+					taxAccounts.some(
+						(account) =>
+							account.archivedAt || account.type !== 'ASSET' || account.subtype !== 'INPUT_TAX'
+					)
+				) {
+					throw new ApplicationError(
+						'ARCHIVED_DEPENDENCY',
+						'The Vendor Bill requires active Input Tax accounts.'
+					)
+				}
 				const expenseLines: PostedJournalLine[] = []
 				const taxLines: PostedJournalLine[] = []
-				const recalculatedTaxAmounts: Prisma.Decimal[] = []
+				const storedTaxAmounts: Prisma.Decimal[] = []
 
 				for (const line of bill.lines) {
 					if (line.lineNetTotal.greaterThan(0)) {
@@ -719,42 +661,37 @@ export async function postVendorBill(
 					}
 
 					if (line.taxId) {
-						const tax = taxes.get(line.taxId)
 						if (
-							!tax ||
-							line.taxRevisionSnapshot !== tax.revision ||
-							line.taxNameSnapshot !== tax.name ||
-							!line.taxRateSnapshot?.equals(tax.rate)
+							!line.taxNameSnapshot ||
+							!line.taxRateSnapshot ||
+							line.taxRevisionSnapshot === null ||
+							!line.taxAccountIdSnapshot
 						) {
 							throw new ApplicationError(
-								'STALE_REVISION',
-								'A selected tax changed. Update the draft Vendor Bill before posting.'
+								'INVALID_STATE',
+								'A Vendor Bill tax snapshot is incomplete.'
 							)
 						}
 
-						const taxAmount = calculateTaxAmount(line.lineNetTotal, tax.rate)
-						recalculatedTaxAmounts.push(taxAmount)
-						if (
-							!line.taxAmount.equals(taxAmount) ||
-							!line.lineTotal.equals(line.lineNetTotal.plus(taxAmount))
-						) {
+						storedTaxAmounts.push(line.taxAmount)
+						if (!line.lineTotal.equals(line.lineNetTotal.plus(line.taxAmount))) {
 							throw new ApplicationError(
 								'INVALID_STATE',
 								'The Vendor Bill tax totals are inconsistent.'
 							)
 						}
-						if (taxAmount.greaterThan(0)) {
+						if (line.taxAmount.greaterThan(0)) {
 							taxLines.push({
-								accountId: tax.inputAccountId,
+								accountId: line.taxAccountIdSnapshot,
 								contactId: bill.contactId,
 								analyticAccountId: null,
-								description: `${bill.number}: ${tax.name}`,
-								debit: taxAmount,
+								description: `${bill.number}: ${line.taxNameSnapshot}`,
+								debit: line.taxAmount,
 								credit: zeroJournalAmount()
 							})
 						}
 					} else {
-						recalculatedTaxAmounts.push(zeroJournalAmount())
+						storedTaxAmounts.push(zeroJournalAmount())
 						if (!line.taxAmount.isZero() || !line.lineTotal.equals(line.lineNetTotal)) {
 							throw new ApplicationError(
 								'INVALID_STATE',
@@ -764,7 +701,7 @@ export async function postVendorBill(
 					}
 				}
 
-				const taxTotal = sumJournalAmounts(recalculatedTaxAmounts)
+				const taxTotal = sumJournalAmounts(storedTaxAmounts)
 				const total = bill.netTotal.plus(taxTotal)
 				if (!bill.taxTotal.equals(taxTotal) || !bill.total.equals(total) || total.isZero()) {
 					throw new ApplicationError(

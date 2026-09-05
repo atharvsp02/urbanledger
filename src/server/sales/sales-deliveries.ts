@@ -23,6 +23,7 @@ import { getPrisma } from '@/server/db/prisma'
 import { allocateDocumentNumber } from '@/server/documents/sequences'
 import { ApplicationError } from '@/server/errors/application-error'
 import { resolvePage } from '@/server/masters/pagination'
+import { assertNotFutureBusinessDate } from '@/server/business/dates'
 import {
 	canonicalRequestHash,
 	executeIdempotentOperation
@@ -180,7 +181,8 @@ export async function deliverSalesOrder(
 				return stored.success ? stored.data : null
 			},
 			resourceId: (delivery) => delivery.id,
-			command: async (transaction) => {
+			command: async (transaction, _accountingLockDate, businessTimezone) => {
+				assertNotFutureBusinessDate(parsed.data.deliveryDate, businessTimezone, 'Delivery date')
 				const order = await transaction.order.findFirst({
 					where: { id: parsed.data.salesOrderId, businessId: actor.businessId, kind: 'SALES' },
 					include: {

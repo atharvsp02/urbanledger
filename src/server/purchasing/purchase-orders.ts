@@ -16,6 +16,7 @@ import {
 	type PurchaseOrderDetail,
 	type PurchaseOrderListInput,
 	type PurchaseOrderListResult,
+	type PurchaseOrderOptions,
 	type PurchaseOrderSummary,
 	type PurchaseOrderTransitionInput,
 	type UpdateDraftPurchaseOrderInput
@@ -39,14 +40,32 @@ type CanonicalLine = {
 	productId: string
 	quantity: JournalDecimal
 	unitPrice: JournalDecimal
-	lineTotal: JournalDecimal
+	lineNetTotal: JournalDecimal
+	taxId: string | null
+	analyticAccountId: string | null
 }
 
 type CanonicalCommercialInput = {
 	vendorId: string
 	orderDate: string
 	lines: CanonicalLine[]
-	total: JournalDecimal
+}
+
+type TaxDependency = {
+	id: string
+	name: string
+	rate: Prisma.Decimal
+	revision: number
+	inputAccountId: string
+}
+
+type PurchaseDependencies = {
+	products: Map<
+		string,
+		{ id: string; name: string; kind: 'GOODS' | 'SERVICE' | 'COMBO'; archivedAt: Date | null }
+	>
+	taxes: Map<string, TaxDependency>
+	analytics: Map<string, { id: string; name: string }>
 }
 
 const maximumTransactionAttempts = 10
@@ -109,20 +128,31 @@ function requestHash(payload: object) {
 function calculateCommercialInput(input: {
 	vendorId: string
 	orderDate: string
-	lines: Array<{ productId: string; quantity: string; unitPrice: string }>
+	lines: Array<{
+		productId: string
+		quantity: string
+		unitPrice: string
+		taxId?: string | null
+		analyticAccountId?: string | null
+	}>
 }): CanonicalCommercialInput {
 	const lines = input.lines.map((line) => {
 		const quantity = new Prisma.Decimal(line.quantity)
 		const unitPrice = new Prisma.Decimal(line.unitPrice)
-		const lineTotal = new Prisma.Decimal(formatJournalAmount(quantity.times(unitPrice)))
-		assertJournalAmountRange(lineTotal)
+		const lineNetTotal = new Prisma.Decimal(formatJournalAmount(quantity.times(unitPrice)))
+		assertJournalAmountRange(lineNetTotal)
 
-		return { productId: line.productId, quantity, unitPrice, lineTotal }
+		return {
+			productId: line.productId,
+			quantity,
+			unitPrice,
+			lineNetTotal,
+			taxId: line.taxId ?? null,
+			analyticAccountId: line.analyticAccountId ?? null
+		}
 	})
-	const total = sumJournalAmounts(lines.map((line) => line.lineTotal))
-	assertJournalAmountRange(total)
 
-	return { vendorId: input.vendorId, orderDate: input.orderDate, lines, total }
+	return { vendorId: input.vendorId, orderDate: input.orderDate, lines }
 }
 
 function canonicalCommercialPayload(input: CanonicalCommercialInput) {
@@ -133,9 +163,10 @@ function canonicalCommercialPayload(input: CanonicalCommercialInput) {
 			productId: line.productId,
 			quantity: line.quantity.toFixed(4),
 			unitPrice: line.unitPrice.toFixed(4),
-			lineTotal: formatJournalAmount(line.lineTotal)
-		})),
-		total: formatJournalAmount(input.total)
+			lineNetTotal: formatJournalAmount(line.lineNetTotal),
+			taxId: line.taxId,
+			analyticAccountId: line.analyticAccountId
+		}))
 	}
 }
 
@@ -175,7 +206,90 @@ async function requirePurchaseDependencies(
 		throw new ApplicationError('ARCHIVED_DEPENDENCY', 'Choose active products.')
 	}
 
-	return new Map(products.map((product) => [product.id, product]))
+	const taxIds = [...new Set(input.lines.flatMap((line) => (line.taxId ? [line.taxId] : [])))]
+	const taxes = await transaction.tax.findMany({
+		where: { id: { in: taxIds }, businessId },
+		include: { inputAccount: true }
+	})
+	if (taxes.length !== taxIds.length) {
+		throw new ApplicationError('NOT_FOUND', 'A selected purchase tax was not found.')
+	}
+	const taxMap = new Map<string, TaxDependency>()
+	for (const tax of taxes) {
+		if (tax.archivedAt) {
+			throw new ApplicationError('ARCHIVED_DEPENDENCY', 'Choose an active purchase tax.')
+		}
+		if (tax.scope !== 'PURCHASE' && tax.scope !== 'BOTH') {
+			throw new ApplicationError('INVALID_STATE', 'Choose a Purchase or Both tax.')
+		}
+		if (
+			!tax.inputAccountId ||
+			!tax.inputAccount ||
+			tax.inputAccount.businessId !== businessId ||
+			tax.inputAccount.archivedAt ||
+			tax.inputAccount.type !== 'ASSET' ||
+			tax.inputAccount.subtype !== 'INPUT_TAX'
+		) {
+			throw new ApplicationError(
+				'INVALID_STATE',
+				'The purchase tax requires an active Input Tax account.'
+			)
+		}
+		taxMap.set(tax.id, {
+			id: tax.id,
+			name: tax.name,
+			rate: tax.rate,
+			revision: tax.revision,
+			inputAccountId: tax.inputAccountId
+		})
+	}
+
+	const analyticIds = [
+		...new Set(
+			input.lines.flatMap((line) => (line.analyticAccountId ? [line.analyticAccountId] : []))
+		)
+	]
+	const analytics = await transaction.analyticAccount.findMany({
+		where: { id: { in: analyticIds }, businessId }
+	})
+	if (analytics.length !== analyticIds.length) {
+		throw new ApplicationError('NOT_FOUND', 'A selected expense analytic account was not found.')
+	}
+	if (analytics.some((account) => account.archivedAt)) {
+		throw new ApplicationError('ARCHIVED_DEPENDENCY', 'Choose active expense analytic accounts.')
+	}
+	if (analytics.some((account) => account.type !== 'EXPENSE')) {
+		throw new ApplicationError('INVALID_STATE', 'Choose Expense analytic accounts.')
+	}
+
+	return {
+		products: new Map(products.map((product) => [product.id, product])),
+		taxes: taxMap,
+		analytics: new Map(analytics.map((account) => [account.id, account]))
+	} satisfies PurchaseDependencies
+}
+
+function calculateCanonicalTotals(
+	input: CanonicalCommercialInput,
+	dependencies: PurchaseDependencies
+) {
+	const lines = input.lines.map((line) => {
+		const tax = line.taxId ? dependencies.taxes.get(line.taxId) : null
+		const taxAmount = tax
+			? new Prisma.Decimal(formatJournalAmount(line.lineNetTotal.times(tax.rate).div(100)))
+			: new Prisma.Decimal('0.00')
+		const grossTotal = line.lineNetTotal.plus(taxAmount)
+		assertJournalAmountRange(taxAmount)
+		assertJournalAmountRange(grossTotal)
+		return { ...line, tax, taxAmount, grossTotal }
+	})
+	const netTotal = sumJournalAmounts(lines.map((line) => line.lineNetTotal))
+	const taxTotal = sumJournalAmounts(lines.map((line) => line.taxAmount))
+	const total = sumJournalAmounts(lines.map((line) => line.grossTotal))
+	assertJournalAmountRange(netTotal)
+	assertJournalAmountRange(taxTotal)
+	assertJournalAmountRange(total)
+	return { lines, netTotal, taxTotal, total }
 }
 
 async function allocatePurchaseOrderNumber(
@@ -225,6 +339,7 @@ async function loadPurchaseOrderDetail(
 	})
 	const lines = await transaction.orderLine.findMany({
 		where: { orderId: order.id },
+		include: { analyticAccount: { select: { id: true, name: true } } },
 		orderBy: [{ position: 'asc' }, { id: 'asc' }]
 	})
 	const receipt = await transaction.purchaseReceipt.findFirst({
@@ -251,6 +366,8 @@ async function loadPurchaseOrderDetail(
 		orderNumber: order.number,
 		orderDate: dateOnly(order.orderDate),
 		state: order.state,
+		netTotal: formatJournalAmount(order.netTotal),
+		taxTotal: formatJournalAmount(order.taxTotal),
 		total: formatJournalAmount(order.total),
 		revision: order.revision,
 		vendor,
@@ -274,9 +391,21 @@ async function loadPurchaseOrderDetail(
 			position: line.position,
 			productId: line.productId,
 			productName: line.productNameSnapshot,
+			productKind: line.productKindSnapshot,
 			quantity: line.quantity.toFixed(4),
 			unitPrice: line.unitPriceSnapshot.toFixed(4),
-			lineTotal: formatJournalAmount(line.lineTotal)
+			lineNetTotal: formatJournalAmount(line.lineTotal),
+			tax:
+				line.taxId && line.taxNameSnapshot && line.taxRateSnapshot
+					? {
+							id: line.taxId,
+							name: line.taxNameSnapshot,
+							rate: line.taxRateSnapshot.toFixed(4)
+						}
+					: null,
+			taxAmount: formatJournalAmount(line.taxAmount),
+			analyticAccount: line.analyticAccount,
+			lineTotal: formatJournalAmount(line.grossTotal)
 		}))
 	}
 }
@@ -326,6 +455,8 @@ async function loadPurchaseOrderSummaries(
 			orderNumber: order.number,
 			orderDate: dateOnly(order.orderDate),
 			state: order.state,
+			netTotal: formatJournalAmount(order.netTotal),
+			taxTotal: formatJournalAmount(order.taxTotal),
 			total: formatJournalAmount(order.total),
 			revision: order.revision,
 			vendor,
@@ -374,14 +505,14 @@ async function executeIdempotentPurchaseOperation(
 						}
 
 						const storedResult = purchaseOrderDetailSchema.safeParse(existing.result)
-						if (!storedResult.success) {
-							throw new ApplicationError(
-								'INVALID_STATE',
-								'The stored purchase order result is invalid.'
-							)
+						if (storedResult.success) return storedResult.data
+						if (existing.resourceId) {
+							return loadPurchaseOrderDetail(transaction, actor.businessId, existing.resourceId)
 						}
-
-						return storedResult.data
+						throw new ApplicationError(
+							'INVALID_STATE',
+							'The stored purchase order result is invalid.'
+						)
 					}
 
 					await transaction.commandOperation.create({
@@ -495,7 +626,7 @@ async function transitionPurchaseOrder(
 						businessId: actor.businessId,
 						kind: 'PURCHASE'
 					},
-					select: { id: true, state: true, revision: true }
+					include: { lines: { orderBy: [{ position: 'asc' }, { id: 'asc' }] } }
 				})
 
 				if (!order) {
@@ -520,6 +651,37 @@ async function transitionPurchaseOrder(
 							'INVALID_STATE',
 							'A received purchase order cannot be cancelled.'
 						)
+					}
+				}
+
+				if (targetState === 'CONFIRMED') {
+					const dependencies = await requirePurchaseDependencies(transaction, actor.businessId, {
+						vendorId: order.contactId,
+						orderDate: dateOnly(order.orderDate),
+						lines: order.lines.map((line) => ({
+							productId: line.productId,
+							quantity: line.quantity,
+							unitPrice: line.unitPriceSnapshot,
+							lineNetTotal: line.lineTotal,
+							taxId: line.taxId,
+							analyticAccountId: line.analyticAccountId
+						}))
+					})
+					for (const line of order.lines) {
+						const tax = line.taxId ? dependencies.taxes.get(line.taxId) : null
+						if (
+							line.taxId &&
+							(!tax ||
+								line.taxNameSnapshot !== tax.name ||
+								line.taxRevisionSnapshot !== tax.revision ||
+								!line.taxRateSnapshot?.equals(tax.rate) ||
+								line.taxAccountIdSnapshot !== tax.inputAccountId)
+						) {
+							throw new ApplicationError(
+								'STALE_REVISION',
+								'A purchase tax changed. Update the draft Purchase Order before confirming.'
+							)
+						}
 					}
 				}
 
@@ -609,6 +771,72 @@ export async function getPurchaseOrder(
 	}
 }
 
+export async function getPurchaseOrderOptions(
+	actor: Actor
+): Promise<ActionResult<PurchaseOrderOptions>> {
+	try {
+		const result = await getPrisma().$transaction(async (transaction) => {
+			await requireCurrentAccountingActor(transaction, actor, 'transactions:read')
+			const [vendors, products, taxes, expenseAnalyticAccounts] = await Promise.all([
+				transaction.contact.findMany({
+					where: {
+						businessId: actor.businessId,
+						archivedAt: null,
+						kind: { in: ['VENDOR', 'BOTH'] }
+					},
+					select: { id: true, name: true },
+					orderBy: [{ name: 'asc' }, { id: 'asc' }]
+				}),
+				transaction.product.findMany({
+					where: { businessId: actor.businessId, archivedAt: null },
+					select: { id: true, name: true, kind: true, purchaseCost: true },
+					orderBy: [{ name: 'asc' }, { id: 'asc' }]
+				}),
+				transaction.tax.findMany({
+					where: {
+						businessId: actor.businessId,
+						archivedAt: null,
+						scope: { in: ['PURCHASE', 'BOTH'] },
+						inputAccount: {
+							businessId: actor.businessId,
+							archivedAt: null,
+							type: 'ASSET',
+							subtype: 'INPUT_TAX'
+						}
+					},
+					select: { id: true, name: true, rate: true },
+					orderBy: [{ name: 'asc' }, { id: 'asc' }]
+				}),
+				transaction.analyticAccount.findMany({
+					where: { businessId: actor.businessId, archivedAt: null, type: 'EXPENSE' },
+					select: { id: true, name: true },
+					orderBy: [{ name: 'asc' }, { id: 'asc' }]
+				})
+			])
+
+			return {
+				vendors,
+				products: products.map((product) => ({
+					id: product.id,
+					name: product.name,
+					kind: product.kind,
+					purchaseCost: product.purchaseCost.toFixed(4)
+				})),
+				taxes: taxes.map((tax) => ({
+					id: tax.id,
+					name: tax.name,
+					rate: tax.rate.toFixed(4)
+				})),
+				expenseAnalyticAccounts
+			} satisfies PurchaseOrderOptions
+		})
+
+		return { ok: true, data: result }
+	} catch (error) {
+		return actionFailure(error)
+	}
+}
+
 export async function createPurchaseOrder(
 	actor: Actor,
 	input: CreatePurchaseOrderInput
@@ -633,11 +861,12 @@ export async function createPurchaseOrder(
 			operation,
 			hash,
 			async (transaction) => {
-				const products = await requirePurchaseDependencies(
+				const dependencies = await requirePurchaseDependencies(
 					transaction,
 					actor.businessId,
 					commercial
 				)
+				const canonical = calculateCanonicalTotals(commercial, dependencies)
 				const number = await allocatePurchaseOrderNumber(
 					transaction,
 					actor.businessId,
@@ -650,17 +879,17 @@ export async function createPurchaseOrder(
 						contactId: commercial.vendorId,
 						number,
 						orderDate: asBusinessDate(commercial.orderDate),
-						netTotal: formatJournalAmount(commercial.total),
-						taxTotal: '0.00',
-						total: formatJournalAmount(commercial.total),
+						netTotal: formatJournalAmount(canonical.netTotal),
+						taxTotal: formatJournalAmount(canonical.taxTotal),
+						total: formatJournalAmount(canonical.total),
 						createdById: actor.userId
 					},
 					select: { id: true }
 				})
 
 				await transaction.orderLine.createMany({
-					data: commercial.lines.map((line, index) => {
-						const product = products.get(line.productId)
+					data: canonical.lines.map((line, index) => {
+						const product = dependencies.products.get(line.productId)
 
 						if (!product) {
 							throw new ApplicationError('INVALID_STATE', 'A selected product is unavailable.')
@@ -673,9 +902,15 @@ export async function createPurchaseOrder(
 							productKindSnapshot: product.kind,
 							quantity: line.quantity.toFixed(4),
 							unitPriceSnapshot: line.unitPrice.toFixed(4),
-							lineTotal: formatJournalAmount(line.lineTotal),
-							taxAmount: '0.00',
-							grossTotal: formatJournalAmount(line.lineTotal),
+							lineTotal: formatJournalAmount(line.lineNetTotal),
+							taxId: line.tax?.id ?? null,
+							taxNameSnapshot: line.tax?.name ?? null,
+							taxRateSnapshot: line.tax?.rate ?? null,
+							taxRevisionSnapshot: line.tax?.revision ?? null,
+							taxAccountIdSnapshot: line.tax?.inputAccountId ?? null,
+							taxAmount: formatJournalAmount(line.taxAmount),
+							grossTotal: formatJournalAmount(line.grossTotal),
+							analyticAccountId: line.analyticAccountId,
 							position: index
 						}
 					})
@@ -712,11 +947,12 @@ export async function updateDraftPurchaseOrder(
 					parsed.data.purchaseOrderId,
 					parsed.data.expectedRevision
 				)
-				const products = await requirePurchaseDependencies(
+				const dependencies = await requirePurchaseDependencies(
 					transaction,
 					actor.businessId,
 					commercial
 				)
+				const canonical = calculateCanonicalTotals(commercial, dependencies)
 				const updated = await transaction.order.updateMany({
 					where: {
 						id: parsed.data.purchaseOrderId,
@@ -728,9 +964,9 @@ export async function updateDraftPurchaseOrder(
 					data: {
 						contactId: commercial.vendorId,
 						orderDate: asBusinessDate(commercial.orderDate),
-						netTotal: formatJournalAmount(commercial.total),
-						taxTotal: '0.00',
-						total: formatJournalAmount(commercial.total),
+						netTotal: formatJournalAmount(canonical.netTotal),
+						taxTotal: formatJournalAmount(canonical.taxTotal),
+						total: formatJournalAmount(canonical.total),
 						revision: { increment: 1 }
 					}
 				})
@@ -746,8 +982,8 @@ export async function updateDraftPurchaseOrder(
 					where: { orderId: parsed.data.purchaseOrderId }
 				})
 				await transaction.orderLine.createMany({
-					data: commercial.lines.map((line, index) => {
-						const product = products.get(line.productId)
+					data: canonical.lines.map((line, index) => {
+						const product = dependencies.products.get(line.productId)
 
 						if (!product) {
 							throw new ApplicationError('INVALID_STATE', 'A selected product is unavailable.')
@@ -760,9 +996,15 @@ export async function updateDraftPurchaseOrder(
 							productKindSnapshot: product.kind,
 							quantity: line.quantity.toFixed(4),
 							unitPriceSnapshot: line.unitPrice.toFixed(4),
-							lineTotal: formatJournalAmount(line.lineTotal),
-							taxAmount: '0.00',
-							grossTotal: formatJournalAmount(line.lineTotal),
+							lineTotal: formatJournalAmount(line.lineNetTotal),
+							taxId: line.tax?.id ?? null,
+							taxNameSnapshot: line.tax?.name ?? null,
+							taxRateSnapshot: line.tax?.rate ?? null,
+							taxRevisionSnapshot: line.tax?.revision ?? null,
+							taxAccountIdSnapshot: line.tax?.inputAccountId ?? null,
+							taxAmount: formatJournalAmount(line.taxAmount),
+							grossTotal: formatJournalAmount(line.grossTotal),
+							analyticAccountId: line.analyticAccountId,
 							position: index
 						}
 					})

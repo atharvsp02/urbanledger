@@ -20,7 +20,9 @@ export const purchaseUnitPriceSchema = z
 const purchaseOrderLineInputSchema = z.object({
 	productId: z.uuid(),
 	quantity: purchaseQuantitySchema,
-	unitPrice: purchaseUnitPriceSchema
+	unitPrice: purchaseUnitPriceSchema,
+	taxId: z.uuid().nullable().optional(),
+	analyticAccountId: z.uuid().nullable().optional()
 })
 
 const purchaseOrderCommercialInputSchema = z.object({
@@ -64,8 +66,13 @@ export const purchaseOrderLineSchema = z.object({
 	position: z.number().int().nonnegative(),
 	productId: z.uuid(),
 	productName: z.string(),
+	productKind: z.enum(['GOODS', 'SERVICE', 'COMBO']),
 	quantity: canonicalQuantitySchema,
 	unitPrice: canonicalUnitPriceSchema,
+	lineNetTotal: canonicalMoneySchema,
+	tax: z.object({ id: z.uuid(), name: z.string(), rate: canonicalUnitPriceSchema }).nullable(),
+	taxAmount: canonicalMoneySchema,
+	analyticAccount: z.object({ id: z.uuid(), name: z.string() }).nullable(),
 	lineTotal: canonicalMoneySchema
 })
 
@@ -75,6 +82,8 @@ export const purchaseOrderDetailSchema = z.object({
 	orderNumber: z.string(),
 	orderDate: z.iso.date(),
 	state: z.enum(purchaseOrderStates),
+	netTotal: canonicalMoneySchema,
+	taxTotal: canonicalMoneySchema,
 	total: canonicalMoneySchema,
 	revision: z.number().int().positive(),
 	vendor: z.object({ id: z.uuid(), name: z.string() }),
@@ -112,4 +121,16 @@ export type PurchaseOrderListResult = {
 	page: number
 	pageSize: number
 	lastPage: number
+}
+
+export type PurchaseOrderOptions = {
+	vendors: Array<{ id: string; name: string }>
+	products: Array<{
+		id: string
+		name: string
+		kind: 'GOODS' | 'SERVICE' | 'COMBO'
+		purchaseCost: string
+	}>
+	taxes: Array<{ id: string; name: string; rate: string }>
+	expenseAnalyticAccounts: Array<{ id: string; name: string }>
 }

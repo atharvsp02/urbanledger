@@ -5,6 +5,7 @@ export {
 	confirmPurchaseOrder,
 	createPurchaseOrder,
 	getPurchaseOrder,
+	getPurchaseOrderOptions,
 	listPurchaseOrders,
 	updateDraftPurchaseOrder
 } from '@/server/purchasing/purchase-orders'

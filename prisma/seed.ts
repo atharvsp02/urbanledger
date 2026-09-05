@@ -58,6 +58,7 @@ const ids = {
 	bankJournal: '50000000-0000-4000-8000-000000000003',
 	cashJournal: '50000000-0000-4000-8000-000000000004',
 	openingJournal: '50000000-0000-4000-8000-000000000005',
+	generalJournal: '50000000-0000-4000-8000-000000000006',
 	tax: '60000000-0000-4000-8000-000000000001',
 	analytic: '70000000-0000-4000-8000-000000000001',
 	budget: '71000000-0000-4000-8000-000000000001',
@@ -466,6 +467,12 @@ async function seed() {
 				code: 'OPN',
 				name: 'Opening Balances',
 				type: 'OPENING' as const
+			},
+			{
+				id: ids.generalJournal,
+				code: 'GEN',
+				name: 'General',
+				type: 'GENERAL' as const
 			}
 		]
 

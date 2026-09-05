@@ -5,9 +5,7 @@ import { AlertCircle } from 'lucide-react'
 
 export type FieldErrorEntry = { fieldId: string; label: string; message: string }
 
-// A submission rejected by the server has to reach a keyboard or screen-reader
-// user without a scroll hunt: the summary takes focus and each entry moves
-// focus to the field it belongs to.
+// Takes focus on rejection, and each entry moves focus to its own field.
 export function FormErrorSummary({
 	title = 'This form could not be submitted',
 	description,

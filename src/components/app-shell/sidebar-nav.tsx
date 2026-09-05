@@ -9,9 +9,6 @@ import type { ShellNavGroup } from '@/components/app-shell/types'
 
 const ROW_CLASS = 'flex min-h-11 items-center gap-2.5 rounded-lg px-3 text-sm'
 
-// Pending feedback for the clicked row only. The spinner overlays the
-// fixed-size icon box so nothing shifts, and the delay keeps prefetched
-// transitions silent. Pending is progress, never selection.
 function NavItemIcon({ icon, isActive }: { icon: React.ReactNode; isActive: boolean }) {
 	const { pending } = useLinkStatus()
 

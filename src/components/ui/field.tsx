@@ -5,9 +5,8 @@ import { cn } from '@/lib/cn'
 export const fieldControlClassName =
 	'min-h-11 w-full rounded-lg border border-border bg-surface px-3 py-2.5 text-base text-foreground transition-colors placeholder:text-faint-foreground focus:border-border-strong aria-invalid:border-danger motion-reduce:transition-none'
 
-// One visual row of side-by-side fields. Each child sets `inRow` so labels,
-// hints and controls share subgrid rows: a hint on one field can never push
-// its control below its neighbour's.
+// Children set `inRow` to share this row's subgrid, so a hint on one field
+// cannot push its control below its neighbour's.
 export function FieldRow({
 	className,
 	children
@@ -79,7 +78,6 @@ export function Field({
 	className,
 	children
 }: {
-	// A stable id lets a server error summary link straight to this control.
 	id?: string
 	label: string
 	hint?: string
@@ -130,8 +128,8 @@ export function Field({
 	)
 }
 
-// For a set of controls rather than one: a <label> may only name a single form
-// element, so a radio or checkbox group is named by a labelled group instead.
+// A <label> may only name one form element, so a control group is named by a
+// labelled group instead.
 export function FieldGroup({
 	id: providedId,
 	label,

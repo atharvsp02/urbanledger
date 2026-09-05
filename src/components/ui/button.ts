@@ -1,7 +1,5 @@
 import { cva, type VariantProps } from 'class-variance-authority'
 
-// Sizes are floors, not fixed heights: every control keeps a 44px tap target
-// and shrinks only its type, so compact financial rows stay usable.
 export const buttonVariants = cva(
 	'inline-flex items-center justify-center gap-2 rounded-lg font-semibold whitespace-nowrap transition-colors motion-reduce:transition-none disabled:cursor-not-allowed disabled:opacity-60',
 	{

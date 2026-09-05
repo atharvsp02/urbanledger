@@ -9,8 +9,8 @@ export function Modal({
 	onClose,
 	title,
 	description,
-	// While a command is in flight the dialog stays put: Escape and the
-	// backdrop must not close a surface whose outcome is still unknown.
+	// While a command is in flight, Escape and the backdrop must not close a
+	// surface whose outcome is still unknown.
 	isDismissible = true,
 	className,
 	footer,

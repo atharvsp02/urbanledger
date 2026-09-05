@@ -5,8 +5,6 @@ import { fieldControlClassName } from '@/components/ui/field'
 import { SelectInput } from '@/components/ui/inputs'
 import { cn } from '@/lib/cn'
 
-// Filters live in the URL and submit as an ordinary GET form, so a filtered
-// list can be shared, reloaded and read by the server without client state.
 export function ListToolbar({
 	action,
 	searchName = 'q',

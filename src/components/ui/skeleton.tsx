@@ -1,7 +1,5 @@
 import { cn } from '@/lib/cn'
 
-// Shapes only, for route loading boundaries: nothing a screen reader would
-// read as content that then changes underneath it.
 export function Skeleton({ className, delayMs }: { className?: string; delayMs?: number }) {
 	return (
 		<div
@@ -11,8 +9,7 @@ export function Skeleton({ className, delayMs }: { className?: string; delayMs?:
 	)
 }
 
-// The live announcement sits outside the busy subtree: aria-busy defers
-// updates inside it, and the region is replaced wholesale rather than updated.
+// The announcement sits outside the busy subtree, which aria-busy defers.
 export function LoadingRegion({
 	label = 'Loading this section.',
 	className,

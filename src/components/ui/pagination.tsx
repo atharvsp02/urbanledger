@@ -85,8 +85,7 @@ function PageLink({
 		</>
 	)
 
-	// A boundary page is stated rather than linked: a disabled anchor is still
-	// a link to somewhere that does not exist.
+	// A disabled anchor still links somewhere that does not exist.
 	if (!isEnabled) {
 		return (
 			<span aria-disabled="true" className={cn(className, 'opacity-50')}>

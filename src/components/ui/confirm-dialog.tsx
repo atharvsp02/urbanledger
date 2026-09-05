@@ -13,8 +13,7 @@ type ConfirmState =
 	| { status: 'committed' }
 
 // Success is what the server committed, not what the click implied: the dialog
-// stays open and repeat-proof until the command resolves, and a failure keeps
-// its own message so the same action can be retried.
+// stays open and repeat-proof until the command resolves.
 export function ConfirmDialog({
 	triggerLabel,
 	triggerVariant = 'secondary',

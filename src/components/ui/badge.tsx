@@ -20,8 +20,7 @@ const badgeVariants = cva(
 
 export type BadgeTone = NonNullable<VariantProps<typeof badgeVariants>['tone']>
 
-// Status is never carried by colour alone: pair each tone with a distinct mark
-// or a label that reads on its own.
+// Status never rides on colour alone; pair each tone with a mark or a label.
 export function Badge({
 	tone,
 	icon: Icon,

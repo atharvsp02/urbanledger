@@ -66,7 +66,6 @@ export function WorkSurface({
 	title: string
 	description?: string
 	action?: React.ReactNode
-	// Tables provide their own edge-to-edge padding.
 	isFlush?: boolean
 	className?: string
 	children: React.ReactNode

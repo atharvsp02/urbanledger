@@ -21,8 +21,8 @@ export type Product = {
 
 export type ProductInput = Omit<Product, 'id' | 'archivedAt'>
 
-// Prices stay decimal strings end to end; a bounded scale keeps room for the
-// server's own multiplication and aggregation later.
+// Prices stay decimal strings end to end; the bounded scale leaves room for
+// server-side multiplication and aggregation.
 const DECIMAL_PATTERN = /^\d{1,11}(\.\d{1,2})?$/
 
 function validateMoney(raw: string, label: string): { value: string; error?: string } {

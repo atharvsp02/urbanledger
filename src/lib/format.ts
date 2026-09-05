@@ -25,8 +25,7 @@ function groupIndian(digits: string): string {
 	return `${groupedHead},${tail}`
 }
 
-// Amounts arrive as decimal strings so no value ever passes through binary
-// floating point on its way to the screen.
+// Amounts stay decimal strings so no value passes through binary floating point.
 export function formatAmount(
 	amount: string,
 	options: { currencySymbol?: string; minimumFractionDigits?: number } = {}

@@ -23,8 +23,7 @@ function initialsOf(name: string): string {
 	return `${first}${last}`.toUpperCase()
 }
 
-// Dimensions are reserved whether or not an image exists, so a contact list
-// does not reflow when uploaded images finish loading or fail.
+// Dimensions are reserved with or without an image, so lists do not reflow.
 export function ContactAvatar({
 	name,
 	imageUrl,

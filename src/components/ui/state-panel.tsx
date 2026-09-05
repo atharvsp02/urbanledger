@@ -35,8 +35,6 @@ export type StatePanelTitleTag = 'p' | 'h1' | 'h2'
 export function StatePanel({
 	icon: Icon,
 	title,
-	// A state that is the whole page needs a heading; one inside a populated
-	// page is not a section of it, so the default stays a paragraph.
 	titleAs: Title = 'p',
 	description,
 	tone,
@@ -95,8 +93,7 @@ export function EmptyState({
 	)
 }
 
-// A failed query is not an empty result. This panel says the data could not be
-// read and offers a retry; it never renders as zero business activity.
+// A failed query is not an empty result; this never renders as zero activity.
 export function ErrorState({
 	title = 'This information could not be loaded',
 	description = 'The request did not complete, so no data is shown. Try again.',

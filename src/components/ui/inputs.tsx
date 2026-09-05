@@ -9,8 +9,6 @@ export function TextInput({
 	return <input {...props} className={cn(fieldControlClassName, className)} />
 }
 
-// Amounts and quantities are entered and displayed in lining, fixed-width
-// figures so columns of digits line up.
 export function AmountInput({
 	className,
 	...props

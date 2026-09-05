@@ -7,7 +7,6 @@ import type { MasterFormState } from '@/lib/masters/form-state'
 import {
 	createContact,
 	getContact,
-	isEmailTaken,
 	setContactArchived,
 	updateContact
 } from '@/server/dev-fixtures/contacts'
@@ -32,10 +31,6 @@ export async function saveContactAction(
 ): Promise<MasterFormState> {
 	const contactId = String(formData.get('contactId') ?? '')
 	const { input, errors } = parseContactInput(readContactForm(formData))
-
-	if (errors.email == null && isEmailTaken(input.email, contactId === '' ? undefined : contactId)) {
-		errors.email = 'Another contact already uses this email address'
-	}
 
 	if (Object.keys(errors).length > 0) {
 		return { status: 'invalid', errors, message: 'Nothing was saved.' }

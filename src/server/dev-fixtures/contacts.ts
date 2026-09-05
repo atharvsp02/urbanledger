@@ -110,8 +110,3 @@ export function setContactArchived(id: string, isArchived: boolean): Contact | u
 	contact.archivedAt = isArchived ? new Date().toISOString().slice(0, 10) : null
 	return contact
 }
-
-export function isEmailTaken(email: string, exceptId?: string): boolean {
-	const normalised = email.trim().toLowerCase()
-	return contacts.some((contact) => contact.email === normalised && contact.id !== exceptId)
-}

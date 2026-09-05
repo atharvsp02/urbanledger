@@ -24,11 +24,15 @@ function readLines(formData: FormData) {
 	const productIds = formData.getAll('lineProductId').map(String)
 	const quantities = formData.getAll('lineQuantity').map(String)
 	const unitPrices = formData.getAll('lineUnitPrice').map(String)
+	const taxIds = formData.getAll('lineTaxId').map(String)
+	const analyticIds = formData.getAll('lineAnalyticAccountId').map(String)
 
 	return productIds.map((productId, index) => ({
 		productId,
 		quantity: quantities[index] ?? '',
-		unitPrice: unitPrices[index] ?? ''
+		unitPrice: unitPrices[index] ?? '',
+		taxId: (taxIds[index] ?? '') === '' ? null : (taxIds[index] as string),
+		analyticAccountId: (analyticIds[index] ?? '') === '' ? null : (analyticIds[index] as string)
 	}))
 }
 

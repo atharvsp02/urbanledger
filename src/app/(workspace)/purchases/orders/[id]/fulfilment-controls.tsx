@@ -48,7 +48,11 @@ export function ReceiptControl({
 				<Field
 					id="receipt-receiptDate"
 					label={RECEIPT_LABELS.receiptDate}
-					hint={`Cannot be before the order date, ${orderDate}.`}
+					hint={
+						hasGoodsLines
+							? 'Goods and Combo lines increase quantity on hand.'
+							: 'Service lines record acceptance without a stock movement.'
+					}
 					error={firstFieldError(state, 'receiptDate')}
 					isRequired
 					inRow

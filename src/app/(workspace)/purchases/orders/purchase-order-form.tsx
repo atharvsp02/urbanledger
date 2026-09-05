@@ -1,6 +1,6 @@
 'use client'
 
-import { useActionState, useMemo, useState } from 'react'
+import { useActionState, useCallback, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { Loader2, Plus, Trash2 } from 'lucide-react'
 import { buttonVariants } from '@/components/ui/button'
@@ -8,7 +8,7 @@ import { Field, FieldRow } from '@/components/ui/field'
 import { FormErrorSummary } from '@/components/ui/form-error-summary'
 import { AmountInput, SelectInput, TextInput } from '@/components/ui/inputs'
 import { fieldErrorEntries, firstFieldError } from '@/components/ui/action-errors'
-import type { PurchaseOrderDetail } from '@/lib/contracts/purchase-order'
+import type { PurchaseOrderDetail, PurchaseOrderOptions } from '@/lib/contracts/purchase-order'
 import { formatAmount, trimMoneyScale } from '@/lib/format'
 import { savePurchaseOrderAction } from '@/app/(workspace)/purchases/orders/actions'
 
@@ -18,34 +18,45 @@ const FIELD_LABELS: Record<string, string> = {
 	lines: 'Product lines'
 }
 
-export type VendorOption = { id: string; name: string }
-export type ProductOption = { id: string; name: string; sku: string | null; purchaseCost: string }
-
-type DraftLine = { key: string; productId: string; quantity: string; unitPrice: string }
-
-function newLine(): DraftLine {
-	return { key: crypto.randomUUID(), productId: '', quantity: '1', unitPrice: '' }
+type DraftLine = {
+	key: string
+	productId: string
+	quantity: string
+	unitPrice: string
+	taxId: string
+	analyticAccountId: string
 }
 
-// Browser arithmetic is preview only; the committed totals come back from the
-// server with the canonical scale.
-function previewLineTotal(quantity: string, unitPrice: string) {
-	const parsedQuantity = Number(quantity)
-	const parsedPrice = Number(unitPrice)
+function newLine(): DraftLine {
+	return {
+		key: crypto.randomUUID(),
+		productId: '',
+		quantity: '1',
+		unitPrice: '',
+		taxId: '',
+		analyticAccountId: ''
+	}
+}
 
-	if (!Number.isFinite(parsedQuantity) || !Number.isFinite(parsedPrice)) return null
+// Browser arithmetic is preview only; committed totals come back from the
+// server at the canonical scale.
+function previewLine(line: DraftLine, rate: number) {
+	const quantity = Number(line.quantity)
+	const unitPrice = Number(line.unitPrice)
 
-	return (Math.round(parsedQuantity * parsedPrice * 100) / 100).toFixed(2)
+	if (!Number.isFinite(quantity) || !Number.isFinite(unitPrice)) return null
+
+	const net = Math.round(quantity * unitPrice * 100) / 100
+	const tax = Math.round(net * rate) / 100
+	return { net, tax, gross: net + tax }
 }
 
 export function PurchaseOrderForm({
 	order,
-	vendors,
-	products
+	options
 }: {
 	order?: PurchaseOrderDetail
-	vendors: readonly VendorOption[]
-	products: readonly ProductOption[]
+	options: PurchaseOrderOptions
 }) {
 	const [state, formAction, isPending] = useActionState(savePurchaseOrderAction, null)
 	const [operationKey] = useState(() => crypto.randomUUID())
@@ -56,25 +67,38 @@ export function PurchaseOrderForm({
 					key: line.id,
 					productId: line.productId,
 					quantity: trimMoneyScale(line.quantity, 0),
-					unitPrice: trimMoneyScale(line.unitPrice)
+					unitPrice: trimMoneyScale(line.unitPrice),
+					taxId: line.tax?.id ?? '',
+					analyticAccountId: line.analyticAccount?.id ?? ''
 				}))
 	)
 
 	const errorOf = (field: string) => firstFieldError(state, field)
-	const previewTotal = useMemo(() => {
-		let total = 0
+	const rateOf = useCallback(
+		(taxId: string) => Number(options.taxes.find((tax) => tax.id === taxId)?.rate ?? '0'),
+		[options.taxes]
+	)
+
+	const totals = useMemo(() => {
+		let net = 0
+		let tax = 0
 
 		for (const line of lines) {
-			const lineTotal = previewLineTotal(line.quantity, line.unitPrice)
-			if (lineTotal != null) total += Number(lineTotal)
+			const preview = previewLine(line, rateOf(line.taxId))
+			if (preview == null) continue
+			net += preview.net
+			tax += preview.tax
 		}
 
-		return (Math.round(total * 100) / 100).toFixed(2)
-	}, [lines])
+		const round = (value: number) => (Math.round(value * 100) / 100).toFixed(2)
+		return { net: round(net), tax: round(tax), gross: round(net + tax) }
+	}, [lines, rateOf])
 
 	function updateLine(key: string, patch: Partial<DraftLine>) {
 		setLines((current) => current.map((line) => (line.key === key ? { ...line, ...patch } : line)))
 	}
+
+	const canSubmit = options.vendors.length > 0 && options.products.length > 0
 
 	return (
 		<form action={formAction} className="flex flex-col gap-6">
@@ -97,7 +121,7 @@ export function PurchaseOrderForm({
 						id="order-vendorId"
 						label={FIELD_LABELS.vendorId}
 						hint={
-							vendors.length === 0
+							options.vendors.length === 0
 								? 'Create an active Vendor or Both contact first.'
 								: 'Only active Vendor and Both contacts appear here.'
 						}
@@ -110,12 +134,12 @@ export function PurchaseOrderForm({
 								{...props}
 								name="vendorId"
 								defaultValue={order?.vendor.id ?? ''}
-								disabled={vendors.length === 0}
+								disabled={options.vendors.length === 0}
 							>
 								<option value="" disabled>
 									Choose a vendor
 								</option>
-								{vendors.map((vendor) => (
+								{options.vendors.map((vendor) => (
 									<option key={vendor.id} value={vendor.id}>
 										{vendor.name}
 									</option>
@@ -156,12 +180,12 @@ export function PurchaseOrderForm({
 
 				<ul className="flex list-none flex-col p-0">
 					{lines.map((line, index) => {
-						const lineTotal = previewLineTotal(line.quantity, line.unitPrice)
+						const preview = previewLine(line, rateOf(line.taxId))
 
 						return (
 							<li
 								key={line.key}
-								className="grid gap-4 border-b border-border px-5 py-4 last:border-b-0 sm:grid-cols-[minmax(0,1fr)_7rem_9rem_8rem_auto] sm:items-end"
+								className="grid gap-4 border-b border-border px-5 py-4 last:border-b-0 lg:grid-cols-[minmax(0,1.4fr)_6rem_8rem_minmax(0,1fr)_minmax(0,1fr)_7rem_auto] lg:items-end"
 							>
 								<Field
 									id={`order-lines-${index}-productId`}
@@ -175,7 +199,7 @@ export function PurchaseOrderForm({
 											name="lineProductId"
 											value={line.productId}
 											onChange={(event) => {
-												const product = products.find(
+												const product = options.products.find(
 													(candidate) => candidate.id === event.target.value
 												)
 												updateLine(line.key, {
@@ -186,15 +210,13 @@ export function PurchaseOrderForm({
 															: line.unitPrice
 												})
 											}}
-											disabled={products.length === 0}
 										>
 											<option value="" disabled>
 												Choose a product
 											</option>
-											{products.map((product) => (
+											{options.products.map((product) => (
 												<option key={product.id} value={product.id}>
 													{product.name}
-													{product.sku == null ? '' : ` (${product.sku})`}
 												</option>
 											))}
 										</SelectInput>
@@ -234,11 +256,57 @@ export function PurchaseOrderForm({
 									)}
 								</Field>
 
-								<p className="text-sm tabular-nums sm:pb-3 sm:text-right">
-									<span className="block text-[11px] font-semibold tracking-[0.05em] text-muted-foreground uppercase sm:hidden">
-										Line total
+								<Field
+									id={`order-lines-${index}-taxId`}
+									label="Purchase tax"
+									error={errorOf(`lines.${index}.taxId`)}
+								>
+									{(props) => (
+										<SelectInput
+											{...props}
+											name="lineTaxId"
+											value={line.taxId}
+											onChange={(event) => updateLine(line.key, { taxId: event.target.value })}
+										>
+											<option value="">No tax</option>
+											{options.taxes.map((tax) => (
+												<option key={tax.id} value={tax.id}>
+													{tax.name} ({trimMoneyScale(tax.rate, 0)}%)
+												</option>
+											))}
+										</SelectInput>
+									)}
+								</Field>
+
+								<Field
+									id={`order-lines-${index}-analyticAccountId`}
+									label="Analytic account"
+									error={errorOf(`lines.${index}.analyticAccountId`)}
+								>
+									{(props) => (
+										<SelectInput
+											{...props}
+											name="lineAnalyticAccountId"
+											value={line.analyticAccountId}
+											onChange={(event) =>
+												updateLine(line.key, { analyticAccountId: event.target.value })
+											}
+										>
+											<option value="">No analytic account</option>
+											{options.expenseAnalyticAccounts.map((account) => (
+												<option key={account.id} value={account.id}>
+													{account.name}
+												</option>
+											))}
+										</SelectInput>
+									)}
+								</Field>
+
+								<p className="text-sm tabular-nums lg:pb-3 lg:text-right">
+									<span className="block text-[11px] font-semibold tracking-[0.05em] text-muted-foreground uppercase lg:hidden">
+										Line gross
 									</span>
-									{lineTotal == null ? '-' : formatAmount(lineTotal)}
+									{preview == null ? '-' : formatAmount(preview.gross.toFixed(2))}
 								</p>
 
 								<button
@@ -252,7 +320,7 @@ export function PurchaseOrderForm({
 									}
 									disabled={lines.length === 1}
 									aria-label={`Remove line ${index + 1}`}
-									className={buttonVariants({ variant: 'ghost', size: 'sm', className: 'sm:mb-1' })}
+									className={buttonVariants({ variant: 'ghost', size: 'sm', className: 'lg:mb-1' })}
 								>
 									<Trash2 aria-hidden="true" className="size-4" />
 								</button>
@@ -261,20 +329,27 @@ export function PurchaseOrderForm({
 					})}
 				</ul>
 
-				<div className="flex items-center justify-between gap-4 border-t border-border px-5 py-4">
-					<span className="text-sm text-muted-foreground">
-						Estimated total. The server recalculates and stores the authoritative amount.
-					</span>
-					<span className="text-lg font-semibold tabular-nums">{formatAmount(previewTotal)}</span>
-				</div>
+				<dl className="flex flex-col gap-2 border-t border-border px-5 py-4 text-sm">
+					<div className="flex items-baseline justify-between gap-4">
+						<dt className="text-muted-foreground">Estimated net</dt>
+						<dd className="tabular-nums">{formatAmount(totals.net)}</dd>
+					</div>
+					<div className="flex items-baseline justify-between gap-4">
+						<dt className="text-muted-foreground">Estimated tax</dt>
+						<dd className="tabular-nums">{formatAmount(totals.tax)}</dd>
+					</div>
+					<div className="flex items-baseline justify-between gap-4 border-t border-border pt-2">
+						<dt className="font-semibold">Estimated gross</dt>
+						<dd className="text-lg font-semibold tabular-nums">{formatAmount(totals.gross)}</dd>
+					</div>
+				</dl>
+				<p className="border-t border-border px-5 py-3 text-sm text-muted-foreground">
+					The server recalculates and stores the authoritative amounts.
+				</p>
 			</div>
 
 			<div className="flex flex-wrap items-center gap-3">
-				<button
-					type="submit"
-					disabled={isPending || vendors.length === 0 || products.length === 0}
-					className={buttonVariants()}
-				>
+				<button type="submit" disabled={isPending || !canSubmit} className={buttonVariants()}>
 					{isPending && (
 						<Loader2
 							aria-hidden="true"

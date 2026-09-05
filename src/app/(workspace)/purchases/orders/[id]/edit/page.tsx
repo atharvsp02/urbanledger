@@ -1,12 +1,10 @@
 import { notFound } from 'next/navigation'
 import type { Metadata } from 'next'
+import { Lock } from 'lucide-react'
 import { PageHeader } from '@/components/app-shell/page-header'
 import { ErrorState, StatePanel } from '@/components/ui/state-panel'
-import { Lock } from 'lucide-react'
 import { getActor } from '@/server/auth/actor'
-import { listSelectableVendors } from '@/server/masters/contacts'
-import { listSelectableProducts } from '@/server/masters/products'
-import { getPurchaseOrder } from '@/server/purchasing'
+import { getPurchaseOrder, getPurchaseOrderOptions } from '@/server/purchasing'
 import { PurchaseOrderForm } from '@/app/(workspace)/purchases/orders/purchase-order-form'
 
 export const metadata: Metadata = { title: 'Edit purchase order' }
@@ -26,18 +24,16 @@ export default async function EditPurchaseOrderPage({
 	}
 
 	const order = result.data
+	const breadcrumbs = [
+		{ label: 'Purchase orders', href: '/purchases/orders' },
+		{ label: order.orderNumber, href: `/purchases/orders/${order.id}` },
+		{ label: 'Edit' }
+	]
 
 	if (order.state !== 'DRAFT') {
 		return (
 			<>
-				<PageHeader
-					title={`Edit ${order.orderNumber}`}
-					breadcrumbs={[
-						{ label: 'Purchase orders', href: '/purchases/orders' },
-						{ label: order.orderNumber, href: `/purchases/orders/${order.id}` },
-						{ label: 'Edit' }
-					]}
-				/>
+				<PageHeader title={`Edit ${order.orderNumber}`} breadcrumbs={breadcrumbs} />
 				<StatePanel
 					icon={Lock}
 					tone="warning"
@@ -48,20 +44,18 @@ export default async function EditPurchaseOrderPage({
 		)
 	}
 
-	const [vendors, products] = await Promise.all([listSelectableVendors(), listSelectableProducts()])
+	const options = await getPurchaseOrderOptions(actor)
+
+	if (!options.ok) return <ErrorState description={options.error.message} />
 
 	return (
 		<>
 			<PageHeader
 				title={`Edit ${order.orderNumber}`}
-				lead="Draft orders can still change. Confirming freezes these lines."
-				breadcrumbs={[
-					{ label: 'Purchase orders', href: '/purchases/orders' },
-					{ label: order.orderNumber, href: `/purchases/orders/${order.id}` },
-					{ label: 'Edit' }
-				]}
+				lead="Draft orders can still change. Confirming freezes these lines, including tax and analytic choices."
+				breadcrumbs={breadcrumbs}
 			/>
-			<PurchaseOrderForm order={order} vendors={vendors} products={products} />
+			<PurchaseOrderForm order={order} options={options.data} />
 		</>
 	)
 }

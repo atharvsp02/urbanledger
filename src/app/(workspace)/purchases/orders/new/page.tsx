@@ -1,13 +1,17 @@
 import type { Metadata } from 'next'
 import { PageHeader } from '@/components/app-shell/page-header'
-import { listSelectableVendors } from '@/server/masters/contacts'
-import { listSelectableProducts } from '@/server/masters/products'
+import { ErrorState } from '@/components/ui/state-panel'
+import { getActor } from '@/server/auth/actor'
+import { getPurchaseOrderOptions } from '@/server/purchasing'
 import { PurchaseOrderForm } from '@/app/(workspace)/purchases/orders/purchase-order-form'
 
 export const metadata: Metadata = { title: 'New purchase order' }
 
 export default async function NewPurchaseOrderPage() {
-	const [vendors, products] = await Promise.all([listSelectableVendors(), listSelectableProducts()])
+	const actor = await getActor()
+	const options = await getPurchaseOrderOptions(actor)
+
+	if (!options.ok) return <ErrorState description={options.error.message} />
 
 	return (
 		<>
@@ -19,7 +23,7 @@ export default async function NewPurchaseOrderPage() {
 					{ label: 'New purchase order' }
 				]}
 			/>
-			<PurchaseOrderForm vendors={vendors} products={products} />
+			<PurchaseOrderForm options={options.data} />
 		</>
 	)
 }

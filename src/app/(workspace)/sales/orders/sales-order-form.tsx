@@ -1,6 +1,6 @@
 'use client'
 
-import { useActionState, useMemo, useState } from 'react'
+import { useActionState, useCallback, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { Loader2, Plus, Trash2 } from 'lucide-react'
 import { buttonVariants } from '@/components/ui/button'
@@ -74,8 +74,10 @@ export function SalesOrderForm({
 	)
 
 	const errorOf = (field: string) => firstFieldError(state, field)
-	const rateOf = (taxId: string) =>
-		Number(options.taxes.find((tax) => tax.id === taxId)?.rate ?? '0')
+	const rateOf = useCallback(
+		(taxId: string) => Number(options.taxes.find((tax) => tax.id === taxId)?.rate ?? '0'),
+		[options.taxes]
+	)
 
 	const totals = useMemo(() => {
 		let net = 0
@@ -90,7 +92,7 @@ export function SalesOrderForm({
 
 		const round = (value: number) => (Math.round(value * 100) / 100).toFixed(2)
 		return { net: round(net), tax: round(tax), gross: round(net + tax) }
-	}, [lines, options.taxes])
+	}, [lines, rateOf])
 
 	function updateLine(key: string, patch: Partial<DraftLine>) {
 		setLines((current) => current.map((line) => (line.key === key ? { ...line, ...patch } : line)))

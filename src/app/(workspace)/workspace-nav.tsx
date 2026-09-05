@@ -3,6 +3,7 @@ import {
 	LayoutDashboard,
 	NotebookPen,
 	Package,
+	Percent,
 	Scale,
 	ShoppingCart,
 	Users
@@ -78,6 +79,13 @@ const NAV_DEFINITION: readonly NavDefinition[] = [
 				icon: <NotebookPen className="size-4" />,
 				href: '/accounting/entries',
 				capability: 'transactions:read'
+			},
+			{
+				id: 'taxes',
+				label: 'Taxes',
+				icon: <Percent className="size-4" />,
+				href: '/accounting/taxes',
+				capability: 'masters:read'
 			},
 			{
 				id: 'trial-balance',

@@ -263,6 +263,20 @@ async function loadSalesOrderDetail(
 	})
 	if (!order) throw new ApplicationError('NOT_FOUND', 'This Sales Order does not exist.')
 
+	const delivery = await transaction.salesDelivery.findFirst({
+		where: { orderId: order.id, businessId },
+		select: { id: true, number: true, deliveryDate: true }
+	})
+	const customerInvoice = await transaction.financialDocument.findFirst({
+		where: {
+			sourceOrderId: order.id,
+			businessId,
+			kind: 'CUSTOMER_INVOICE',
+			state: { not: 'CANCELLED' }
+		},
+		select: { id: true, number: true, state: true }
+	})
+
 	return {
 		id: order.id,
 		kind: 'SALES',
@@ -277,6 +291,22 @@ async function loadSalesOrderDetail(
 		createdBy: order.createdBy,
 		createdAt: order.createdAt.toISOString(),
 		updatedAt: order.updatedAt.toISOString(),
+		delivery:
+			delivery == null
+				? null
+				: {
+						id: delivery.id,
+						deliveryNumber: delivery.number,
+						deliveryDate: dateOnly(delivery.deliveryDate)
+					},
+		customerInvoice:
+			customerInvoice == null
+				? null
+				: {
+						id: customerInvoice.id,
+						invoiceNumber: customerInvoice.number,
+						state: customerInvoice.state
+					},
 		lines: order.lines.map((line) => ({
 			id: line.id,
 			position: line.position,

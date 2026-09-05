@@ -22,6 +22,11 @@ import {
 	sumJournalAmounts,
 	type JournalDecimal
 } from '@/server/accounting/money'
+import {
+	allocateJournalEntryNumber,
+	assertAccountingDateUnlocked,
+	commitPostedJournalEntry
+} from '@/server/accounting/posting-kernel'
 import { getPrisma } from '@/server/db/prisma'
 import { ApplicationError } from '@/server/errors/application-error'
 
@@ -87,15 +92,6 @@ function dateString(value: Date) {
 	return value.toISOString().slice(0, 10)
 }
 
-function assertUnlocked(postingDate: string, accountingLockDate: Date | null) {
-	if (accountingLockDate && postingDate <= dateString(accountingLockDate)) {
-		throw new ApplicationError(
-			'LOCKED_PERIOD',
-			'The posting date is in a locked accounting period.'
-		)
-	}
-}
-
 function normalizedLines(lines: PostingInput['lines']) {
 	return lines.map((line) => ({
 		accountId: line.accountId,
@@ -153,30 +149,6 @@ function waitBeforeTransactionRetry(attempt: number) {
 	return new Promise((resolve) => setTimeout(resolve, delayMilliseconds))
 }
 
-async function allocateJournalEntryNumber(
-	transaction: AccountingTransaction,
-	businessId: string,
-	postingDate: string
-) {
-	const period = postingDate.slice(0, 4)
-	const sequence = await transaction.documentSequence.upsert({
-		where: {
-			businessId_kind_period: { businessId, kind: 'JOURNAL_ENTRY', period }
-		},
-		create: {
-			businessId,
-			kind: 'JOURNAL_ENTRY',
-			period,
-			prefix: `JE/${period}`,
-			nextNumber: BigInt('2')
-		},
-		update: { nextNumber: { increment: 1 } }
-	})
-
-	const number = sequence.nextNumber - BigInt('1')
-	return `${sequence.prefix}/${number.toString().padStart(6, '0')}`
-}
-
 async function loadPostingDependencies(
 	transaction: AccountingTransaction,
 	actor: Actor,
@@ -184,7 +156,7 @@ async function loadPostingDependencies(
 	input: PostingInput,
 	accountingLockDate: Date | null
 ): Promise<ValidatedPosting> {
-	assertUnlocked(input.postingDate, accountingLockDate)
+	assertAccountingDateUnlocked(input.postingDate, accountingLockDate)
 
 	const lines = normalizedLines(input.lines)
 	const accountIds = [...new Set(lines.map((line) => line.accountId))]
@@ -352,37 +324,19 @@ async function createPostedJournalEntry(
 	validated: ValidatedPosting,
 	entryNumber: string
 ): Promise<JournalPostingResult> {
-	const entry = await transaction.journalEntry.create({
-		data: {
-			businessId: actor.businessId,
-			journalId: input.journalId,
-			postingDate: validated.postingDate,
-			reference: entryNumber,
-			source,
-			createdById: actor.userId
-		},
-		select: { id: true }
-	})
-
-	await transaction.journalItem.createMany({
-		data: validated.lines.map((line) => ({
-			entryId: entry.id,
-			accountId: line.accountId,
-			contactId: line.contactId,
-			analyticAccountId: line.analyticAccountId,
-			description: line.description,
-			debit: formatJournalAmount(line.debit),
-			credit: formatJournalAmount(line.credit)
-		}))
-	})
-
-	await transaction.journalEntry.update({
-		where: { id: entry.id },
-		data: { state: 'POSTED', postedAt: new Date() }
+	const entry = await commitPostedJournalEntry(transaction, {
+		businessId: actor.businessId,
+		journalId: input.journalId,
+		postingDate: validated.postingDate,
+		reference: entryNumber,
+		source,
+		sourceReference: null,
+		createdById: actor.userId,
+		lines: validated.lines
 	})
 
 	const result: JournalPostingResult = {
-		entryId: entry.id,
+		entryId: entry.entryId,
 		entryNumber,
 		postingDate: input.postingDate,
 		source,
@@ -397,7 +351,7 @@ async function createPostedJournalEntry(
 			actorUserId: actor.userId,
 			action: `journal.${source.toLowerCase()}.posted`,
 			targetType: 'JournalEntry',
-			targetId: entry.id,
+			targetId: entry.entryId,
 			requestId: input.operationKey,
 			details: {
 				entryNumber,
@@ -588,7 +542,7 @@ export async function reverseJournalEntry(
 			operationNames.REVERSAL,
 			hash,
 			async (transaction, accountingLockDate) => {
-				assertUnlocked(parsed.data.postingDate, accountingLockDate)
+				assertAccountingDateUnlocked(parsed.data.postingDate, accountingLockDate)
 
 				const original = await transaction.journalEntry.findFirst({
 					where: {

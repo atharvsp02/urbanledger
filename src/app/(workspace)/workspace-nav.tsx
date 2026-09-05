@@ -1,4 +1,4 @@
-import { BookOpen, LayoutDashboard, Package, Users } from 'lucide-react'
+import { BookOpen, LayoutDashboard, NotebookPen, Package, Users } from 'lucide-react'
 import type { Actor, Capability } from '@/lib/contracts/access'
 import type { ShellNavGroup } from '@/components/app-shell/types'
 
@@ -55,6 +55,13 @@ const NAV_DEFINITION: readonly NavDefinition[] = [
 				label: 'Chart of accounts',
 				icon: <BookOpen className="size-4" />,
 				href: '/accounting/accounts',
+				capability: 'masters:read'
+			},
+			{
+				id: 'journals',
+				label: 'Journals',
+				icon: <NotebookPen className="size-4" />,
+				href: '/accounting/journals',
 				capability: 'masters:read'
 			}
 		]

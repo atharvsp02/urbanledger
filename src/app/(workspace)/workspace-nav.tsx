@@ -1,7 +1,18 @@
-import { Package, Users } from 'lucide-react'
+import { LayoutDashboard, Package, Users } from 'lucide-react'
 import type { ShellNavGroup } from '@/components/app-shell/types'
 
 export const WORKSPACE_NAV_GROUPS: readonly ShellNavGroup[] = [
+	{
+		id: 'overview',
+		items: [
+			{
+				id: 'dashboard',
+				label: 'Dashboard',
+				icon: <LayoutDashboard className="size-4" />,
+				href: '/dashboard'
+			}
+		]
+	},
 	{
 		id: 'master-data',
 		label: 'Master data',

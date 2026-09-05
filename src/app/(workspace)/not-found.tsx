@@ -8,8 +8,8 @@ export default function WorkspaceNotFound() {
 			titleAs="h1"
 			description="This record does not exist, or the address is wrong. It may have been removed."
 		>
-			<Link href="/contacts" className={buttonVariants({ size: 'sm' })}>
-				Back to contacts
+			<Link href="/dashboard" className={buttonVariants({ size: 'sm' })}>
+				Back to dashboard
 			</Link>
 		</NotFoundState>
 	)

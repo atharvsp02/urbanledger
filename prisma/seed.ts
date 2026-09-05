@@ -4,6 +4,12 @@ import { PrismaClient } from '../src/generated/prisma/client'
 import { createClient, type User } from '@supabase/supabase-js'
 import { z } from 'zod'
 import { normalizeEmail, normalizeLoginId, passwordSchema } from '../src/lib/auth/credentials'
+import type { Actor } from '../src/lib/contracts/access'
+import type { ActionResult } from '../src/lib/contracts/errors'
+import { capabilitiesByRole } from '../src/server/access/permissions'
+import { postManualJournal, postOpeningJournal } from '../src/server/accounting'
+import { getPrisma } from '../src/server/db/prisma'
+import { confirmPurchaseOrder, createPurchaseOrder } from '../src/server/purchasing'
 
 loadEnvironment({ path: '.env.local', quiet: true })
 
@@ -95,6 +101,105 @@ const identities = [
 		password: environment.URBANLEDGER_SEED_VENDOR_PASSWORD
 	}
 ] as const
+
+const activityOperationKeys = {
+	confirmedPurchaseOrder: '81000000-0000-4000-8000-000000000001',
+	confirmPurchaseOrder: '81000000-0000-4000-8000-000000000002',
+	draftPurchaseOrder: '81000000-0000-4000-8000-000000000003',
+	openingBalance: '81000000-0000-4000-8000-000000000004',
+	manualExpense: '81000000-0000-4000-8000-000000000005'
+} as const
+
+function requireCommandResult<T>(result: ActionResult<T>) {
+	if (!result.ok) {
+		throw new Error(`${result.error.code}: ${result.error.message}`)
+	}
+
+	return result.data
+}
+
+async function seedRepresentativeActivity(providerUserId: string) {
+	const actor: Actor = {
+		userId: ids.accountantUser,
+		providerUserId,
+		businessId: ids.business,
+		role: 'ACCOUNTANT',
+		contactId: null,
+		displayName: 'Kabir Malhotra',
+		capabilities: capabilitiesByRole.ACCOUNTANT
+	}
+	const confirmedOrder = requireCommandResult(
+		await createPurchaseOrder(actor, {
+			operationKey: activityOperationKeys.confirmedPurchaseOrder,
+			vendorId: ids.vendor,
+			orderDate: '2026-08-02',
+			lines: [{ productId: ids.chair, quantity: '5', unitPrice: '5000.0000' }]
+		})
+	)
+
+	requireCommandResult(
+		await confirmPurchaseOrder(actor, {
+			operationKey: activityOperationKeys.confirmPurchaseOrder,
+			purchaseOrderId: confirmedOrder.id,
+			expectedRevision: confirmedOrder.revision
+		})
+	)
+
+	requireCommandResult(
+		await createPurchaseOrder(actor, {
+			operationKey: activityOperationKeys.draftPurchaseOrder,
+			vendorId: ids.vendor,
+			orderDate: '2026-08-06',
+			lines: [{ productId: ids.diningSet, quantity: '1', unitPrice: '32000.0000' }]
+		})
+	)
+
+	requireCommandResult(
+		await postOpeningJournal(actor, {
+			operationKey: activityOperationKeys.openingBalance,
+			journalId: ids.openingJournal,
+			postingDate: '2026-08-01',
+			memo: 'Owner capital introduced',
+			lines: [
+				{
+					accountId: ids.bank,
+					description: 'Owner capital introduced',
+					debit: '100000.00',
+					credit: '0'
+				},
+				{
+					accountId: ids.capital,
+					description: 'Owner capital introduced',
+					debit: '0',
+					credit: '100000.00'
+				}
+			]
+		})
+	)
+
+	requireCommandResult(
+		await postManualJournal(actor, {
+			operationKey: activityOperationKeys.manualExpense,
+			journalId: ids.generalJournal,
+			postingDate: '2026-08-03',
+			memo: 'Workshop supplies purchased',
+			lines: [
+				{
+					accountId: ids.purchases,
+					description: 'Workshop supplies purchased',
+					debit: '5000.00',
+					credit: '0'
+				},
+				{
+					accountId: ids.bank,
+					description: 'Workshop supplies purchased',
+					debit: '0',
+					credit: '5000.00'
+				}
+			]
+		})
+	)
+}
 
 async function findAuthUser(email: string) {
 	for (let page = 1; ; page += 1) {
@@ -530,14 +635,18 @@ async function seed() {
 			}
 		})
 	})
+
+	const accountantAuthUser = authUsers.get('ulacct')
+	if (!accountantAuthUser) throw new Error('Missing Auth identity for ulacct.')
+	await seedRepresentativeActivity(accountantAuthUser.id)
 }
 
 seed()
 	.then(() => {
-		console.log('Prepared uladmin, ulacct, ulcust and ulvend with showcase master data.')
+		console.log('Prepared local accounts, master data and representative business activity.')
 	})
 	.catch((error) => {
 		console.error(error instanceof Error ? error.message : 'Local seed failed.')
 		process.exitCode = 1
 	})
-	.finally(() => prisma.$disconnect())
+	.finally(() => Promise.all([prisma.$disconnect(), getPrisma().$disconnect()]))

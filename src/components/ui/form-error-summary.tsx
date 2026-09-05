@@ -16,12 +16,15 @@ export function FormErrorSummary({
 	errors: readonly FieldErrorEntry[]
 }) {
 	const headingRef = useRef<HTMLParagraphElement>(null)
+	// A rejection without field errors, such as a stale revision, still has to
+	// reach the reader.
+	const isVisible = errors.length > 0 || description != null
 
 	useEffect(() => {
-		if (errors.length > 0) headingRef.current?.focus()
-	}, [errors])
+		if (isVisible) headingRef.current?.focus()
+	}, [isVisible, description, errors])
 
-	if (errors.length === 0) return null
+	if (!isVisible) return null
 
 	return (
 		<div
@@ -40,24 +43,26 @@ export function FormErrorSummary({
 			{description != null && (
 				<p className="mt-2 text-sm leading-relaxed text-muted-foreground">{description}</p>
 			)}
-			<ul className="mt-3 flex list-none flex-col gap-1.5 p-0">
-				{errors.map((error) => (
-					<li key={error.fieldId}>
-						<a
-							href={`#${error.fieldId}`}
-							className="text-sm text-danger underline underline-offset-2"
-							onClick={(event) => {
-								const target = document.getElementById(error.fieldId)
-								if (target == null) return
-								event.preventDefault()
-								target.focus()
-							}}
-						>
-							{error.label}: {error.message}
-						</a>
-					</li>
-				))}
-			</ul>
+			{errors.length > 0 && (
+				<ul className="mt-3 flex list-none flex-col gap-1.5 p-0">
+					{errors.map((error) => (
+						<li key={error.fieldId}>
+							<a
+								href={`#${error.fieldId}`}
+								className="text-sm text-danger underline underline-offset-2"
+								onClick={(event) => {
+									const target = document.getElementById(error.fieldId)
+									if (target == null) return
+									event.preventDefault()
+									target.focus()
+								}}
+							>
+								{error.label}: {error.message}
+							</a>
+						</li>
+					))}
+				</ul>
+			)}
 		</div>
 	)
 }

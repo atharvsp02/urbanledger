@@ -181,7 +181,7 @@ async function seedRepresentativeActivity(providerUserId: string) {
 		await confirmPurchaseOrder(actor, {
 			operationKey: activityOperationKeys.confirmPurchaseOrder,
 			purchaseOrderId: confirmedOrder.id,
-			expectedRevision: confirmedOrder.revision
+			expectedRevision: 1
 		})
 	)
 

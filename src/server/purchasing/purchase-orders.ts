@@ -156,6 +156,20 @@ function calculateCommercialInput(input: {
 }
 
 function canonicalCommercialPayload(input: CanonicalCommercialInput) {
+	if (input.lines.every((line) => !line.taxId && !line.analyticAccountId)) {
+		return {
+			vendorId: input.vendorId,
+			orderDate: input.orderDate,
+			lines: input.lines.map((line) => ({
+				productId: line.productId,
+				quantity: line.quantity.toFixed(4),
+				unitPrice: line.unitPrice.toFixed(4),
+				lineTotal: formatJournalAmount(line.lineNetTotal)
+			})),
+			total: formatJournalAmount(sumJournalAmounts(input.lines.map((line) => line.lineNetTotal)))
+		}
+	}
+
 	return {
 		vendorId: input.vendorId,
 		orderDate: input.orderDate,

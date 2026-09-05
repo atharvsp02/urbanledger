@@ -8,8 +8,23 @@ import type { Actor } from '../src/lib/contracts/access'
 import type { ActionResult } from '../src/lib/contracts/errors'
 import { capabilitiesByRole } from '../src/server/access/permissions'
 import { postManualJournal, postOpeningJournal } from '../src/server/accounting'
+import { createBudget } from '../src/server/budgets'
 import { getPrisma } from '../src/server/db/prisma'
-import { confirmPurchaseOrder, createPurchaseOrder } from '../src/server/purchasing'
+import {
+	confirmPurchaseOrder,
+	createPurchaseOrder,
+	createVendorBillFromPurchaseOrder,
+	postVendorBill,
+	receivePurchaseOrder
+} from '../src/server/purchasing'
+import { recordCustomerPayment, recordVendorPayment, reversePayment } from '../src/server/payments'
+import {
+	confirmSalesOrder,
+	createCustomerInvoiceFromSalesOrder,
+	createSalesOrder,
+	deliverSalesOrder,
+	postCustomerInvoice
+} from '../src/server/sales'
 
 loadEnvironment({ path: '.env.local', quiet: true })
 
@@ -67,6 +82,7 @@ const ids = {
 	generalJournal: '50000000-0000-4000-8000-000000000006',
 	tax: '60000000-0000-4000-8000-000000000001',
 	analytic: '70000000-0000-4000-8000-000000000001',
+	incomeAnalytic: '70000000-0000-4000-8000-000000000002',
 	budget: '71000000-0000-4000-8000-000000000001',
 	budgetLine: '72000000-0000-4000-8000-000000000001'
 } as const
@@ -107,7 +123,31 @@ const activityOperationKeys = {
 	confirmPurchaseOrder: '81000000-0000-4000-8000-000000000002',
 	draftPurchaseOrder: '81000000-0000-4000-8000-000000000003',
 	openingBalance: '81000000-0000-4000-8000-000000000004',
-	manualExpense: '81000000-0000-4000-8000-000000000005'
+	manualExpense: '81000000-0000-4000-8000-000000000005',
+	showcasePurchaseOrder: '82000000-0000-4000-8000-000000000001',
+	showcasePurchaseConfirm: '82000000-0000-4000-8000-000000000002',
+	showcasePurchaseReceipt: '82000000-0000-4000-8000-000000000003',
+	showcaseVendorBill: '82000000-0000-4000-8000-000000000004',
+	showcaseVendorBillPost: '82000000-0000-4000-8000-000000000005',
+	showcaseVendorPayment: '82000000-0000-4000-8000-000000000006',
+	showcaseVendorPaymentReverse: '82000000-0000-4000-8000-000000000007',
+	paidSalesOrder: '83000000-0000-4000-8000-000000000001',
+	paidSalesConfirm: '83000000-0000-4000-8000-000000000002',
+	paidSalesDelivery: '83000000-0000-4000-8000-000000000003',
+	paidInvoice: '83000000-0000-4000-8000-000000000004',
+	paidInvoicePost: '83000000-0000-4000-8000-000000000005',
+	paidCustomerPayment: '83000000-0000-4000-8000-000000000006',
+	partialSalesOrder: '84000000-0000-4000-8000-000000000001',
+	partialSalesConfirm: '84000000-0000-4000-8000-000000000002',
+	partialSalesDelivery: '84000000-0000-4000-8000-000000000003',
+	partialInvoice: '84000000-0000-4000-8000-000000000004',
+	partialInvoicePost: '84000000-0000-4000-8000-000000000005',
+	partialCustomerPayment: '84000000-0000-4000-8000-000000000006',
+	unpaidSalesOrder: '85000000-0000-4000-8000-000000000001',
+	unpaidSalesConfirm: '85000000-0000-4000-8000-000000000002',
+	unpaidInvoice: '85000000-0000-4000-8000-000000000003',
+	unpaidInvoicePost: '85000000-0000-4000-8000-000000000004',
+	incomeBudget: '86000000-0000-4000-8000-000000000001'
 } as const
 
 function requireCommandResult<T>(result: ActionResult<T>) {
@@ -197,6 +237,263 @@ async function seedRepresentativeActivity(providerUserId: string) {
 					credit: '5000.00'
 				}
 			]
+		})
+	)
+}
+
+async function seedShowcaseActivity(providerUserId: string) {
+	const actor: Actor = {
+		userId: ids.accountantUser,
+		providerUserId,
+		businessId: ids.business,
+		role: 'ACCOUNTANT',
+		contactId: null,
+		displayName: 'Kabir Malhotra',
+		capabilities: capabilitiesByRole.ACCOUNTANT
+	}
+
+	requireCommandResult(
+		await createBudget(actor, {
+			operationKey: activityOperationKeys.incomeBudget,
+			name: 'Sales Growth 2026',
+			startsOn: '2026-04-01',
+			endsOn: '2027-03-31',
+			responsibleUserId: ids.accountantUser,
+			lines: [{ analyticAccountId: ids.incomeAnalytic, plannedAmount: '750000.00' }]
+		})
+	)
+
+	const purchaseOrder = requireCommandResult(
+		await createPurchaseOrder(actor, {
+			operationKey: activityOperationKeys.showcasePurchaseOrder,
+			vendorId: ids.vendor,
+			orderDate: '2026-05-01',
+			lines: [
+				{
+					productId: ids.chair,
+					quantity: '10',
+					unitPrice: '5000.0000',
+					taxId: ids.tax,
+					analyticAccountId: ids.analytic
+				}
+			]
+		})
+	)
+	const confirmedPurchaseOrder = requireCommandResult(
+		await confirmPurchaseOrder(actor, {
+			operationKey: activityOperationKeys.showcasePurchaseConfirm,
+			purchaseOrderId: purchaseOrder.id,
+			expectedRevision: 1
+		})
+	)
+	requireCommandResult(
+		await receivePurchaseOrder(actor, {
+			operationKey: activityOperationKeys.showcasePurchaseReceipt,
+			purchaseOrderId: confirmedPurchaseOrder.id,
+			expectedRevision: 2,
+			receiptDate: '2026-05-02'
+		})
+	)
+	const vendorBill = requireCommandResult(
+		await createVendorBillFromPurchaseOrder(actor, {
+			operationKey: activityOperationKeys.showcaseVendorBill,
+			purchaseOrderId: confirmedPurchaseOrder.id,
+			expectedPurchaseOrderRevision: 3,
+			billDate: '2026-05-03',
+			dueDate: '2026-05-31',
+			vendorReference: 'NTW-2026-051'
+		})
+	)
+	const postedVendorBill = requireCommandResult(
+		await postVendorBill(actor, {
+			operationKey: activityOperationKeys.showcaseVendorBillPost,
+			vendorBillId: vendorBill.id,
+			expectedRevision: 1,
+			journalId: ids.purchaseJournal
+		})
+	)
+	const vendorPayment = requireCommandResult(
+		await recordVendorPayment(actor, {
+			operationKey: activityOperationKeys.showcaseVendorPayment,
+			documentId: postedVendorBill.id,
+			expectedDocumentRevision: 2,
+			journalId: ids.bankJournal,
+			paymentDate: '2026-05-12',
+			amount: postedVendorBill.total,
+			reference: 'Bank transfer to Narmada Timber Works'
+		})
+	)
+	requireCommandResult(
+		await reversePayment(actor, {
+			operationKey: activityOperationKeys.showcaseVendorPaymentReverse,
+			paymentId: vendorPayment.id,
+			expectedRevision: 1,
+			reversalDate: '2026-08-28',
+			reason: 'Vendor transfer returned by bank'
+		})
+	)
+
+	const paidOrder = requireCommandResult(
+		await createSalesOrder(actor, {
+			operationKey: activityOperationKeys.paidSalesOrder,
+			customerId: ids.customer,
+			orderDate: '2026-05-05',
+			lines: [
+				{
+					productId: ids.chair,
+					quantity: '2',
+					unitPrice: '7500.0000',
+					taxId: ids.tax,
+					analyticAccountId: ids.incomeAnalytic
+				}
+			]
+		})
+	)
+	const confirmedPaidOrder = requireCommandResult(
+		await confirmSalesOrder(actor, {
+			operationKey: activityOperationKeys.paidSalesConfirm,
+			salesOrderId: paidOrder.id,
+			expectedRevision: 1
+		})
+	)
+	requireCommandResult(
+		await deliverSalesOrder(actor, {
+			operationKey: activityOperationKeys.paidSalesDelivery,
+			salesOrderId: confirmedPaidOrder.id,
+			expectedRevision: 2,
+			deliveryDate: '2026-05-06'
+		})
+	)
+	const paidInvoice = requireCommandResult(
+		await createCustomerInvoiceFromSalesOrder(actor, {
+			operationKey: activityOperationKeys.paidInvoice,
+			salesOrderId: confirmedPaidOrder.id,
+			expectedSalesOrderRevision: 3,
+			invoiceDate: '2026-05-06',
+			dueDate: '2026-05-20',
+			reference: 'Office seating delivery'
+		})
+	)
+	const postedPaidInvoice = requireCommandResult(
+		await postCustomerInvoice(actor, {
+			operationKey: activityOperationKeys.paidInvoicePost,
+			customerInvoiceId: paidInvoice.id,
+			expectedRevision: 1,
+			journalId: ids.salesJournal
+		})
+	)
+	requireCommandResult(
+		await recordCustomerPayment(actor, {
+			operationKey: activityOperationKeys.paidCustomerPayment,
+			documentId: postedPaidInvoice.id,
+			expectedDocumentRevision: 2,
+			journalId: ids.bankJournal,
+			paymentDate: '2026-05-10',
+			amount: postedPaidInvoice.total,
+			reference: 'Customer bank receipt'
+		})
+	)
+
+	const partialOrder = requireCommandResult(
+		await createSalesOrder(actor, {
+			operationKey: activityOperationKeys.partialSalesOrder,
+			customerId: ids.customer,
+			orderDate: '2026-06-10',
+			lines: [
+				{
+					productId: ids.design,
+					quantity: '1',
+					unitPrice: '12000.0000',
+					taxId: ids.tax,
+					analyticAccountId: ids.incomeAnalytic
+				}
+			]
+		})
+	)
+	const confirmedPartialOrder = requireCommandResult(
+		await confirmSalesOrder(actor, {
+			operationKey: activityOperationKeys.partialSalesConfirm,
+			salesOrderId: partialOrder.id,
+			expectedRevision: 1
+		})
+	)
+	requireCommandResult(
+		await deliverSalesOrder(actor, {
+			operationKey: activityOperationKeys.partialSalesDelivery,
+			salesOrderId: confirmedPartialOrder.id,
+			expectedRevision: 2,
+			deliveryDate: '2026-06-11'
+		})
+	)
+	const partialInvoice = requireCommandResult(
+		await createCustomerInvoiceFromSalesOrder(actor, {
+			operationKey: activityOperationKeys.partialInvoice,
+			salesOrderId: confirmedPartialOrder.id,
+			expectedSalesOrderRevision: 3,
+			invoiceDate: '2026-06-11',
+			dueDate: '2026-06-30',
+			reference: 'Workspace planning engagement'
+		})
+	)
+	const postedPartialInvoice = requireCommandResult(
+		await postCustomerInvoice(actor, {
+			operationKey: activityOperationKeys.partialInvoicePost,
+			customerInvoiceId: partialInvoice.id,
+			expectedRevision: 1,
+			journalId: ids.salesJournal
+		})
+	)
+	requireCommandResult(
+		await recordCustomerPayment(actor, {
+			operationKey: activityOperationKeys.partialCustomerPayment,
+			documentId: postedPartialInvoice.id,
+			expectedDocumentRevision: 2,
+			journalId: ids.bankJournal,
+			paymentDate: '2026-06-15',
+			amount: '4000.00',
+			reference: 'Part payment received'
+		})
+	)
+
+	const unpaidOrder = requireCommandResult(
+		await createSalesOrder(actor, {
+			operationKey: activityOperationKeys.unpaidSalesOrder,
+			customerId: ids.secondCustomer,
+			orderDate: '2026-07-10',
+			lines: [
+				{
+					productId: ids.diningSet,
+					quantity: '1',
+					unitPrice: '48000.0000',
+					taxId: ids.tax,
+					analyticAccountId: ids.incomeAnalytic
+				}
+			]
+		})
+	)
+	const confirmedUnpaidOrder = requireCommandResult(
+		await confirmSalesOrder(actor, {
+			operationKey: activityOperationKeys.unpaidSalesConfirm,
+			salesOrderId: unpaidOrder.id,
+			expectedRevision: 1
+		})
+	)
+	const unpaidInvoice = requireCommandResult(
+		await createCustomerInvoiceFromSalesOrder(actor, {
+			operationKey: activityOperationKeys.unpaidInvoice,
+			salesOrderId: confirmedUnpaidOrder.id,
+			expectedSalesOrderRevision: 2,
+			invoiceDate: '2026-07-10',
+			dueDate: '2026-07-31',
+			reference: 'Dining room furnishing order'
+		})
+	)
+	requireCommandResult(
+		await postCustomerInvoice(actor, {
+			operationKey: activityOperationKeys.unpaidInvoicePost,
+			customerInvoiceId: unpaidInvoice.id,
+			expectedRevision: 1,
+			journalId: ids.salesJournal
 		})
 	)
 }
@@ -591,11 +888,11 @@ async function seed() {
 
 		await transaction.tax.upsert({
 			where: { id: ids.tax },
-			update: {},
+			update: { name: 'GST 18%' },
 			create: {
 				id: ids.tax,
 				businessId: ids.business,
-				name: 'Illustrative 18%',
+				name: 'GST 18%',
 				rate: '18.0000',
 				scope: 'BOTH',
 				inputAccountId: ids.inputTax,
@@ -611,6 +908,17 @@ async function seed() {
 				businessId: ids.business,
 				name: 'Furniture Purchases',
 				type: 'EXPENSE'
+			}
+		})
+
+		await transaction.analyticAccount.upsert({
+			where: { id: ids.incomeAnalytic },
+			update: {},
+			create: {
+				id: ids.incomeAnalytic,
+				businessId: ids.business,
+				name: 'Furniture Sales',
+				type: 'INCOME'
 			}
 		})
 
@@ -639,6 +947,7 @@ async function seed() {
 	const accountantAuthUser = authUsers.get('ulacct')
 	if (!accountantAuthUser) throw new Error('Missing Auth identity for ulacct.')
 	await seedRepresentativeActivity(accountantAuthUser.id)
+	await seedShowcaseActivity(accountantAuthUser.id)
 }
 
 seed()

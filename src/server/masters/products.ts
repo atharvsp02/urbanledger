@@ -10,6 +10,7 @@ import {
 import { requireActor } from '@/server/auth/actor'
 import { getPrisma } from '@/server/db/prisma'
 import { ApplicationError } from '@/server/errors/application-error'
+import { recordMasterAudit } from '@/server/masters/audit'
 import { decimalToString } from '@/server/masters/decimal'
 import { resolvePage, type PageResult } from '@/server/masters/pagination'
 
@@ -108,10 +109,12 @@ export async function createProduct(input: ProductInput) {
 	const parsed = productInputSchema.parse(input)
 	await assertCategoryUsable(actor.businessId, parsed.categoryId)
 
-	return getPrisma().product.create({
+	const product = await getPrisma().product.create({
 		data: { ...parsed, businessId: actor.businessId },
 		select: { id: true }
 	})
+	await recordMasterAudit(actor, 'product.created', 'Product', product.id)
+	return product
 }
 
 export async function updateProduct(productId: string, revision: number, input: ProductInput) {
@@ -119,7 +122,7 @@ export async function updateProduct(productId: string, revision: number, input: 
 	const parsed = productInputSchema.parse(input)
 	const prisma = getPrisma()
 
-	return prisma.$transaction(
+	const product = await prisma.$transaction(
 		async (transaction) => {
 			const product = await transaction.product.findFirst({
 				where: { id: productId, businessId: actor.businessId },
@@ -177,6 +180,8 @@ export async function updateProduct(productId: string, revision: number, input: 
 		},
 		{ isolationLevel: 'Serializable' }
 	)
+	await recordMasterAudit(actor, 'product.updated', 'Product', productId)
+	return product
 }
 
 export async function setProductArchived(productId: string, revision: number, isArchived: boolean) {
@@ -196,6 +201,12 @@ export async function setProductArchived(productId: string, revision: number, is
 		)
 	}
 
+	await recordMasterAudit(
+		actor,
+		isArchived ? 'product.archived' : 'product.restored',
+		'Product',
+		productId
+	)
 	return { id: productId }
 }
 

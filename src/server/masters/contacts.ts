@@ -13,6 +13,7 @@ import { requireActor } from '@/server/auth/actor'
 import { contactProvisioningKey } from '@/server/masters/contact-access'
 import { getPrisma } from '@/server/db/prisma'
 import { ApplicationError } from '@/server/errors/application-error'
+import { recordMasterAudit } from '@/server/masters/audit'
 import { resolvePage, type PageResult } from '@/server/masters/pagination'
 
 type ContactRow = Prisma.ContactModel & {
@@ -115,10 +116,12 @@ export async function createContact(input: ContactInput) {
 	const actor = await requireActor('contacts:create')
 	const parsed = contactInputSchema.parse(input)
 
-	return getPrisma().contact.create({
+	const contact = await getPrisma().contact.create({
 		data: { ...parsed, businessId: actor.businessId },
 		select: { id: true }
 	})
+	await recordMasterAudit(actor, 'contact.created', 'Contact', contact.id)
+	return contact
 }
 
 export async function updateContact(contactId: string, revision: number, input: ContactInput) {
@@ -139,6 +142,7 @@ export async function updateContact(contactId: string, revision: number, input: 
 		)
 	}
 
+	await recordMasterAudit(actor, 'contact.updated', 'Contact', contactId)
 	return { id: contactId }
 }
 
@@ -159,6 +163,12 @@ export async function setContactArchived(contactId: string, revision: number, is
 		)
 	}
 
+	await recordMasterAudit(
+		actor,
+		isArchived ? 'contact.archived' : 'contact.restored',
+		'Contact',
+		contactId
+	)
 	return { id: contactId }
 }
 

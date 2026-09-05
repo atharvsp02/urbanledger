@@ -12,6 +12,7 @@ import {
 import { requireActor } from '@/server/auth/actor'
 import { getPrisma } from '@/server/db/prisma'
 import { ApplicationError } from '@/server/errors/application-error'
+import { recordMasterAudit } from '@/server/masters/audit'
 
 const ACCOUNT_REF = { select: { id: true, code: true, name: true } } as const
 
@@ -138,7 +139,7 @@ export async function createJournal(input: JournalInput) {
 	const defaults = await resolveDefaults(actor.businessId, parsed)
 
 	try {
-		return await getPrisma().journal.create({
+		const journal = await getPrisma().journal.create({
 			data: {
 				businessId: actor.businessId,
 				code: parsed.code,
@@ -148,6 +149,8 @@ export async function createJournal(input: JournalInput) {
 			},
 			select: { id: true }
 		})
+		await recordMasterAudit(actor, 'journal.created', 'Journal', journal.id)
+		return journal
 	} catch (error) {
 		if (isUniqueConstraintFailure(error)) throw duplicateCodeError()
 		throw error
@@ -201,6 +204,7 @@ export async function updateJournal(journalId: string, revision: number, input: 
 		throw error
 	}
 
+	await recordMasterAudit(actor, 'journal.updated', 'Journal', journalId)
 	return { id: journalId }
 }
 
@@ -229,5 +233,11 @@ export async function setJournalArchived(journalId: string, revision: number, is
 		)
 	}
 
+	await recordMasterAudit(
+		actor,
+		isArchived ? 'journal.archived' : 'journal.restored',
+		'Journal',
+		journalId
+	)
 	return { id: journalId }
 }

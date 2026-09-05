@@ -12,6 +12,7 @@ import {
 import { requireActor } from '@/server/auth/actor'
 import { getPrisma } from '@/server/db/prisma'
 import { ApplicationError } from '@/server/errors/application-error'
+import { recordMasterAudit } from '@/server/masters/audit'
 import { resolvePage, type PageResult } from '@/server/masters/pagination'
 
 type LedgerAccountRow = Prisma.LedgerAccountModel
@@ -141,10 +142,12 @@ export async function createLedgerAccount(input: LedgerAccountInput) {
 	const parsed = ledgerAccountInputSchema.parse(input)
 
 	try {
-		return await getPrisma().ledgerAccount.create({
+		const account = await getPrisma().ledgerAccount.create({
 			data: { ...parsed, businessId: actor.businessId },
 			select: { id: true }
 		})
+		await recordMasterAudit(actor, 'ledger_account.created', 'LedgerAccount', account.id)
+		return account
 	} catch (error) {
 		if (isUniqueConstraintFailure(error)) throw duplicateCodeError()
 		throw error
@@ -202,6 +205,7 @@ export async function updateLedgerAccount(
 		throw error
 	}
 
+	await recordMasterAudit(actor, 'ledger_account.updated', 'LedgerAccount', accountId)
 	return { id: accountId }
 }
 
@@ -260,5 +264,11 @@ export async function setLedgerAccountArchived(
 		)
 	}
 
+	await recordMasterAudit(
+		actor,
+		isArchived ? 'ledger_account.archived' : 'ledger_account.restored',
+		'LedgerAccount',
+		accountId
+	)
 	return { id: accountId }
 }

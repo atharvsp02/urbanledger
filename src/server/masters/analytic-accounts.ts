@@ -11,6 +11,7 @@ import {
 } from '@/lib/masters/analytic-account'
 import { getPrisma } from '@/server/db/prisma'
 import { ApplicationError } from '@/server/errors/application-error'
+import { recordMasterAudit } from '@/server/masters/audit'
 import { assertCapability } from '@/server/masters/authorize'
 import { resolvePage, type PageResult } from '@/server/masters/pagination'
 
@@ -109,10 +110,12 @@ export async function createAnalyticAccount(actor: Actor, input: AnalyticAccount
 	const parsed = analyticAccountInputSchema.parse(input)
 
 	try {
-		return await getPrisma().analyticAccount.create({
+		const account = await getPrisma().analyticAccount.create({
 			data: { businessId: actor.businessId, ...parsed },
 			select: { id: true }
 		})
+		await recordMasterAudit(actor, 'analytic_account.created', 'AnalyticAccount', account.id)
+		return account
 	} catch (error) {
 		if (isUniqueConstraintFailure(error)) throw duplicateNameError()
 		throw error
@@ -163,6 +166,7 @@ export async function updateAnalyticAccount(
 		throw error
 	}
 
+	await recordMasterAudit(actor, 'analytic_account.updated', 'AnalyticAccount', analyticAccountId)
 	return { id: analyticAccountId }
 }
 
@@ -196,5 +200,11 @@ export async function setAnalyticAccountArchived(
 		)
 	}
 
+	await recordMasterAudit(
+		actor,
+		isArchived ? 'analytic_account.archived' : 'analytic_account.restored',
+		'AnalyticAccount',
+		analyticAccountId
+	)
 	return { id: analyticAccountId }
 }

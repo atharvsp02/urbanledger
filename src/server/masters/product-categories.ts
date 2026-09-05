@@ -7,6 +7,7 @@ import {
 import { requireActor } from '@/server/auth/actor'
 import { getPrisma } from '@/server/db/prisma'
 import { ApplicationError } from '@/server/errors/application-error'
+import { recordMasterAudit } from '@/server/masters/audit'
 
 export async function listProductCategories(options: { includeArchived?: boolean } = {}) {
 	const actor = await requireActor('masters:read')
@@ -43,10 +44,12 @@ export async function createProductCategory(input: ProductCategoryInput) {
 		})
 	}
 
-	return prisma.productCategory.create({
+	const category = await prisma.productCategory.create({
 		data: { businessId: actor.businessId, name: parsed.name },
 		select: { id: true, name: true }
 	})
+	await recordMasterAudit(actor, 'product_category.created', 'ProductCategory', category.id)
+	return category
 }
 
 export async function setProductCategoryArchived(categoryId: string, isArchived: boolean) {
@@ -62,5 +65,11 @@ export async function setProductCategoryArchived(categoryId: string, isArchived:
 		throw new ApplicationError('NOT_FOUND', 'This category does not exist.')
 	}
 
+	await recordMasterAudit(
+		actor,
+		isArchived ? 'product_category.archived' : 'product_category.restored',
+		'ProductCategory',
+		categoryId
+	)
 	return { id: categoryId }
 }

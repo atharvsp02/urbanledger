@@ -11,6 +11,7 @@ import {
 } from '@/lib/masters/tax'
 import { getPrisma } from '@/server/db/prisma'
 import { ApplicationError } from '@/server/errors/application-error'
+import { recordMasterAudit } from '@/server/masters/audit'
 import { assertCapability } from '@/server/masters/authorize'
 import { resolvePage, type PageResult } from '@/server/masters/pagination'
 
@@ -146,7 +147,7 @@ export async function createTax(actor: Actor, input: TaxInput) {
 	const accounts = await resolveAccounts(actor.businessId, parsed)
 
 	try {
-		return await getPrisma().tax.create({
+		const tax = await getPrisma().tax.create({
 			data: {
 				businessId: actor.businessId,
 				name: parsed.name,
@@ -156,6 +157,8 @@ export async function createTax(actor: Actor, input: TaxInput) {
 			},
 			select: { id: true }
 		})
+		await recordMasterAudit(actor, 'tax.created', 'Tax', tax.id)
+		return tax
 	} catch (error) {
 		if (isUniqueConstraintFailure(error)) throw duplicateNameError()
 		throw error
@@ -192,6 +195,7 @@ export async function updateTax(actor: Actor, taxId: string, revision: number, i
 		throw error
 	}
 
+	await recordMasterAudit(actor, 'tax.updated', 'Tax', taxId)
 	return { id: taxId }
 }
 
@@ -217,6 +221,7 @@ export async function setTaxArchived(
 		)
 	}
 
+	await recordMasterAudit(actor, isArchived ? 'tax.archived' : 'tax.restored', 'Tax', taxId)
 	return { id: taxId }
 }
 

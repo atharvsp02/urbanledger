@@ -1,5 +1,6 @@
 import {
 	BookOpen,
+	FileText,
 	History,
 	LayoutDashboard,
 	NotebookPen,
@@ -153,6 +154,13 @@ const NAV_DEFINITION: readonly NavDefinition[] = [
 				label: 'Deliveries',
 				icon: <Truck className="size-4" />,
 				href: '/sales/deliveries',
+				capability: 'transactions:read'
+			},
+			{
+				id: 'customer-invoices',
+				label: 'Customer invoices',
+				icon: <FileText className="size-4" />,
+				href: '/sales/invoices',
 				capability: 'transactions:read'
 			}
 		]

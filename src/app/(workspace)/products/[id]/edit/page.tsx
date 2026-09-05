@@ -23,10 +23,7 @@ export default async function EditProductPage({ params }: { params: Promise<{ id
 					{ label: 'Edit' }
 				]}
 			/>
-			<FixtureNotice>
-				Products are held in temporary local data until the master-data service is connected.
-				Changes saved here do not survive a server restart.
-			</FixtureNotice>
+			<FixtureNotice master="products" />
 			<ProductForm product={product} />
 		</>
 	)

@@ -13,10 +13,7 @@ export default function NewProductPage() {
 				lead="Create a goods, service or combo product."
 				breadcrumbs={[{ label: 'Products', href: '/products' }, { label: 'New product' }]}
 			/>
-			<FixtureNotice>
-				Products are held in temporary local data until the master-data service is connected.
-				Records created here do not survive a server restart.
-			</FixtureNotice>
+			<FixtureNotice master="products" />
 			<ProductForm />
 		</>
 	)

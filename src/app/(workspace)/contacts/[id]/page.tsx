@@ -10,6 +10,7 @@ import { CONTACT_TYPE_LABELS } from '@/lib/masters/contact'
 import { formatBusinessDate } from '@/lib/format'
 import { getContact } from '@/server/dev-fixtures/contacts'
 import { ArchiveControl } from '@/app/(workspace)/contacts/[id]/archive-control'
+import { FixtureNotice } from '@/app/(workspace)/fixture-notice'
 
 export default async function ContactDetailPage({ params }: { params: Promise<{ id: string }> }) {
 	const { id } = await params
@@ -47,6 +48,8 @@ export default async function ContactDetailPage({ params }: { params: Promise<{ 
 					</>
 				}
 			/>
+
+			<FixtureNotice master="contacts" />
 
 			<div className="flex flex-wrap items-center gap-3">
 				<ContactAvatar name={contact.name} />

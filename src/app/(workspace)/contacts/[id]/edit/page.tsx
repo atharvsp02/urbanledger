@@ -23,10 +23,7 @@ export default async function EditContactPage({ params }: { params: Promise<{ id
 					{ label: 'Edit' }
 				]}
 			/>
-			<FixtureNotice>
-				Contacts are held in temporary local data until the master-data service is connected.
-				Changes saved here do not survive a server restart.
-			</FixtureNotice>
+			<FixtureNotice master="contacts" />
 			<ContactForm contact={contact} />
 		</>
 	)

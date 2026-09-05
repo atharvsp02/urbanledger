@@ -10,6 +10,7 @@ import { Pagination } from '@/components/ui/pagination'
 import { ProductThumbnail } from '@/components/ui/placeholder'
 import { SkeletonTable } from '@/components/ui/skeleton'
 import { EmptyState } from '@/components/ui/state-panel'
+import { FixtureNotice } from '@/app/(workspace)/fixture-notice'
 import { formatAmount } from '@/lib/format'
 import {
 	PRODUCT_KINDS,
@@ -154,6 +155,8 @@ export default async function ProductsPage({
 					</Link>
 				}
 			/>
+
+			<FixtureNotice master="products" />
 
 			<ListToolbar
 				action="/products"

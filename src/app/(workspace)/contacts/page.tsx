@@ -10,6 +10,7 @@ import { Pagination } from '@/components/ui/pagination'
 import { ContactAvatar } from '@/components/ui/placeholder'
 import { SkeletonTable } from '@/components/ui/skeleton'
 import { EmptyState } from '@/components/ui/state-panel'
+import { FixtureNotice } from '@/app/(workspace)/fixture-notice'
 import {
 	CONTACT_TYPES,
 	CONTACT_TYPE_LABELS,
@@ -151,6 +152,8 @@ export default async function ContactsPage({
 					</Link>
 				}
 			/>
+
+			<FixtureNotice master="contacts" />
 
 			<ListToolbar
 				action="/contacts"

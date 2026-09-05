@@ -8,6 +8,7 @@ import { formatAmount, formatBusinessDate } from '@/lib/format'
 import { PRODUCT_KIND_LABELS } from '@/lib/masters/product'
 import { getProduct } from '@/server/dev-fixtures/products'
 import { ArchiveControl } from '@/app/(workspace)/products/[id]/archive-control'
+import { FixtureNotice } from '@/app/(workspace)/fixture-notice'
 
 export default async function ProductDetailPage({ params }: { params: Promise<{ id: string }> }) {
 	const { id } = await params
@@ -35,6 +36,8 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
 					</>
 				}
 			/>
+
+			<FixtureNotice master="products" />
 
 			<div className="flex flex-wrap items-center gap-3">
 				<ProductThumbnail kind={product.kind} />

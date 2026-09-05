@@ -13,10 +13,7 @@ export default function NewContactPage() {
 				lead="Create a customer or vendor record."
 				breadcrumbs={[{ label: 'Contacts', href: '/contacts' }, { label: 'New contact' }]}
 			/>
-			<FixtureNotice>
-				Contacts are held in temporary local data until the master-data service is connected.
-				Records created here do not survive a server restart.
-			</FixtureNotice>
+			<FixtureNotice master="contacts" />
 			<ContactForm />
 		</>
 	)

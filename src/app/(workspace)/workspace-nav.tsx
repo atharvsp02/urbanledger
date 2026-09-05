@@ -3,7 +3,9 @@ import {
 	LayoutDashboard,
 	NotebookPen,
 	Package,
+	Percent,
 	Scale,
+	Tags,
 	ShoppingCart,
 	Users
 } from 'lucide-react'
@@ -78,6 +80,20 @@ const NAV_DEFINITION: readonly NavDefinition[] = [
 				icon: <NotebookPen className="size-4" />,
 				href: '/accounting/entries',
 				capability: 'transactions:read'
+			},
+			{
+				id: 'taxes',
+				label: 'Taxes',
+				icon: <Percent className="size-4" />,
+				href: '/accounting/taxes',
+				capability: 'masters:read'
+			},
+			{
+				id: 'analytic-accounts',
+				label: 'Analytic accounts',
+				icon: <Tags className="size-4" />,
+				href: '/accounting/analytic-accounts',
+				capability: 'masters:read'
 			},
 			{
 				id: 'trial-balance',

@@ -82,12 +82,18 @@ export async function resetContactPortalAccess(contactId: string) {
 			 WHERE pa."contactId" = $1`,
 			[contactId]
 		)
-		await client.query(
-			`DELETE FROM app.application_users WHERE id IN (
-				SELECT "userId" FROM app.portal_access WHERE "contactId" = $1
-			)`,
+		const userIds = await client.query<{ userId: string }>(
+			'SELECT "userId" FROM app.portal_access WHERE "contactId" = $1',
 			[contactId]
 		)
+		await client.query('DELETE FROM app.portal_access WHERE "contactId" = $1', [contactId])
+
+		if (userIds.rows.length > 0) {
+			await client.query('DELETE FROM app.application_users WHERE id = ANY($1::uuid[])', [
+				userIds.rows.map((row) => row.userId)
+			])
+		}
+
 		return rows.rows.map((row) => row.normalizedEmail)
 	})
 

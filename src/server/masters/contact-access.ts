@@ -87,13 +87,6 @@ export async function enableContactPortalAccess(
 		throw new ApplicationError('NOT_FOUND', 'This contact does not exist.')
 	}
 
-	if (contact.portalAccess) {
-		throw new ApplicationError(
-			'CONFLICT',
-			'This contact already has portal access. An administrator must resolve it.'
-		)
-	}
-
 	let operation = await prisma.provisioningOperation.findUnique({
 		where: { operationKey }
 	})
@@ -105,8 +98,17 @@ export async function enableContactPortalAccess(
 		)
 	}
 
+	// A repeat of the completed operation returns its original outcome, so only
+	// access this operation did not create is a conflict.
 	if (operation?.state === 'COMPLETED') {
 		return { contactId: contact.id, loginId: parsed.loginId }
+	}
+
+	if (contact.portalAccess) {
+		throw new ApplicationError(
+			'CONFLICT',
+			'This contact already has portal access. An administrator must resolve it.'
+		)
 	}
 
 	const conflicting = await prisma.applicationUser.findFirst({

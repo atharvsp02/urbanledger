@@ -291,6 +291,7 @@ model ProvisioningOperation {
   id                String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   businessId        String?           @db.Uuid
   actorUserId       String?           @db.Uuid
+  contactId         String?           @db.Uuid
   operationKey      String            @unique @db.Uuid
   kind              ProvisioningKind
   normalizedLoginId String            @db.VarChar(12)
@@ -303,31 +304,34 @@ model ProvisioningOperation {
   updatedAt         DateTime          @updatedAt @db.Timestamptz(6)
   business          Business?         @relation(fields: [businessId], references: [id], onDelete: Restrict)
   actor             ApplicationUser?  @relation("ProvisioningActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+  contact           Contact?          @relation(fields: [contactId], references: [id], onDelete: Restrict)
 
   @@index([normalizedLoginId])
   @@index([normalizedEmail])
+  @@index([contactId])
   @@map("provisioning_operations")
 }
 
 model Contact {
-  id                 String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  businessId         String              @db.Uuid
+  id                 String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  businessId         String                  @db.Uuid
   kind               ContactKind
-  name               String              @db.VarChar(160)
-  email              String?             @db.VarChar(320)
-  mobile             String?             @db.VarChar(32)
-  street             String?             @db.VarChar(240)
-  city               String?             @db.VarChar(100)
-  state              String?             @db.VarChar(100)
-  pincode            String?             @db.VarChar(16)
-  imageAssetId       String?             @unique @db.Uuid
-  revision           Int                 @default(1)
-  archivedAt         DateTime?           @db.Timestamptz(6)
-  createdAt          DateTime            @default(now()) @db.Timestamptz(6)
-  updatedAt          DateTime            @updatedAt @db.Timestamptz(6)
-  business           Business            @relation(fields: [businessId], references: [id], onDelete: Restrict)
-  imageAsset         FileAsset?          @relation("ContactImage", fields: [imageAssetId], references: [id], onDelete: SetNull)
+  name               String                  @db.VarChar(160)
+  email              String?                 @db.VarChar(320)
+  mobile             String?                 @db.VarChar(32)
+  street             String?                 @db.VarChar(240)
+  city               String?                 @db.VarChar(100)
+  state              String?                 @db.VarChar(100)
+  pincode            String?                 @db.VarChar(16)
+  imageAssetId       String?                 @unique @db.Uuid
+  revision           Int                     @default(1)
+  archivedAt         DateTime?               @db.Timestamptz(6)
+  createdAt          DateTime                @default(now()) @db.Timestamptz(6)
+  updatedAt          DateTime                @updatedAt @db.Timestamptz(6)
+  business           Business                @relation(fields: [businessId], references: [id], onDelete: Restrict)
+  imageAsset         FileAsset?              @relation("ContactImage", fields: [imageAssetId], references: [id], onDelete: SetNull)
   portalAccess       PortalAccess?
+  provisioning       ProvisioningOperation[]
   journalItems       JournalItem[]
   orders             Order[]
   purchaseReceipts   PurchaseReceipt[]

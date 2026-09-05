@@ -439,6 +439,14 @@ export async function updateRecoveredPassword(
 		}
 	}
 
+	const { data } = await supabase.auth.getUser()
+	if (data.user) {
+		await getPrisma().applicationUser.updateMany({
+			where: { providerUserId: data.user.id },
+			data: { mustChangePassword: false }
+		})
+	}
+
 	return { ok: true, data: null }
 }
 

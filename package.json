@@ -26,6 +26,7 @@
 		"format:check": "prettier --check .",
 		"check": "pnpm lint && pnpm typecheck && pnpm format:check",
 		"test:accounting": "node --conditions=react-server --import tsx --test --test-concurrency=1 tests/accounting/*.test.ts",
+		"test:ledger-activity": "node --conditions=react-server --import tsx --test --test-concurrency=1 tests/accounting/ledger-activity.test.ts",
 		"test:purchase-orders": "node --conditions=react-server --import tsx --test --test-concurrency=1 tests/purchasing/purchase-orders.test.ts",
 		"test:e2e": "playwright test"
 	},

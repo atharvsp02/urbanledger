@@ -3,19 +3,50 @@ import { notFound } from 'next/navigation'
 import { PageHeader, WorkSurface } from '@/components/app-shell/page-header'
 import { Badge } from '@/components/ui/badge'
 import { buttonVariants } from '@/components/ui/button'
-import { formatBusinessDate } from '@/lib/format'
+import { DataTable, type TableColumn } from '@/components/ui/data-table'
+import { fieldControlClassName } from '@/components/ui/field'
+import { Pagination } from '@/components/ui/pagination'
+import { EmptyState, ErrorState, ForbiddenState } from '@/components/ui/state-panel'
+import { JOURNAL_ENTRY_SOURCE_LABELS, JOURNAL_ENTRY_STATUS_LABELS } from '@/lib/accounting/display'
+import type { JournalEntrySummary } from '@/lib/contracts/accounting'
+import { formatAmount, formatBusinessDate } from '@/lib/format'
 import {
 	JOURNAL_REQUIREMENTS,
 	JOURNAL_TYPE_HINTS,
 	JOURNAL_TYPE_LABELS
 } from '@/lib/masters/journal'
 import { getActor } from '@/server/auth/actor'
+import { getJournalActivity } from '@/server/accounting'
 import { getJournalDetail } from '@/server/masters/journals'
 import { ApplicationError } from '@/server/errors/application-error'
 import { ArchiveControl } from '@/app/(workspace)/accounting/journals/[id]/archive-control'
 
-export default async function JournalDetailPage({ params }: { params: Promise<{ id: string }> }) {
+const PAGE_SIZE = 20
+
+type ActivityParams = { from?: string; to?: string; page?: string }
+
+function activityHref(journalId: string, params: ActivityParams, page: number) {
+	const query = new URLSearchParams()
+
+	if (params.from) query.set('from', params.from)
+	if (params.to) query.set('to', params.to)
+	if (page > 1) query.set('page', String(page))
+
+	const queryString = query.toString()
+	return queryString
+		? `/accounting/journals/${journalId}?${queryString}`
+		: `/accounting/journals/${journalId}`
+}
+
+export default async function JournalDetailPage({
+	params,
+	searchParams
+}: {
+	params: Promise<{ id: string }>
+	searchParams: Promise<ActivityParams>
+}) {
 	const { id } = await params
+	const filters = await searchParams
 	const actor = await getActor()
 	let journal
 
@@ -35,6 +66,43 @@ export default async function JournalDetailPage({ params }: { params: Promise<{ 
 		defaultControlAccountId: journal.defaultControlAccount,
 		defaultLiquidityAccountId: journal.defaultLiquidityAccount
 	}
+	const activityResult = await getJournalActivity(actor, {
+		journalId: id,
+		dateFrom: filters.from || undefined,
+		dateTo: filters.to || undefined,
+		page: Number(filters.page || '1') || 1,
+		pageSize: PAGE_SIZE
+	})
+	const activityColumns: readonly TableColumn<JournalEntrySummary>[] = [
+		{
+			id: 'date',
+			header: 'Entry date',
+			cell: (entry) => formatBusinessDate(entry.postingDate)
+		},
+		{ id: 'reference', header: 'Reference', cell: (entry) => entry.reference },
+		{
+			id: 'source',
+			header: 'Source',
+			cell: (entry) => JOURNAL_ENTRY_SOURCE_LABELS[entry.source]
+		},
+		{
+			id: 'state',
+			header: 'State',
+			cell: (entry) => JOURNAL_ENTRY_STATUS_LABELS[entry.status]
+		},
+		{
+			id: 'debit',
+			header: 'Debit',
+			isNumeric: true,
+			cell: (entry) => formatAmount(entry.totalDebit)
+		},
+		{
+			id: 'credit',
+			header: 'Credit',
+			isNumeric: true,
+			cell: (entry) => formatAmount(entry.totalCredit)
+		}
+	]
 
 	return (
 		<>
@@ -126,6 +194,102 @@ export default async function JournalDetailPage({ params }: { params: Promise<{ 
 					</dl>
 				</WorkSurface>
 			</div>
+
+			{activityResult.ok ? (
+				<>
+					<div className="grid gap-4 sm:grid-cols-3">
+						<WorkSurface title="All posted entries">
+							<p className="text-2xl font-semibold tabular-nums">
+								{activityResult.data.postedEntryCount}
+							</p>
+						</WorkSurface>
+						<WorkSurface title="All posted debits">
+							<p className="text-2xl font-semibold tabular-nums">
+								{formatAmount(activityResult.data.totalDebit)}
+							</p>
+						</WorkSurface>
+						<WorkSurface title="All posted credits">
+							<p className="text-2xl font-semibold tabular-nums">
+								{formatAmount(activityResult.data.totalCredit)}
+							</p>
+						</WorkSurface>
+					</div>
+
+					<form
+						method="get"
+						action={`/accounting/journals/${journal.id}`}
+						aria-label="Filter journal activity"
+						className="flex flex-col gap-3 rounded-xl border border-border bg-surface p-4 sm:flex-row sm:flex-wrap sm:items-end"
+					>
+						<label className="flex flex-col gap-1.5 text-sm font-medium text-foreground">
+							From
+							<input
+								type="date"
+								name="from"
+								defaultValue={filters.from}
+								className={fieldControlClassName}
+							/>
+						</label>
+						<label className="flex flex-col gap-1.5 text-sm font-medium text-foreground">
+							To
+							<input
+								type="date"
+								name="to"
+								defaultValue={filters.to}
+								className={fieldControlClassName}
+							/>
+						</label>
+						<div className="flex flex-wrap gap-2">
+							<button type="submit" className={buttonVariants({ size: 'sm' })}>
+								Apply
+							</button>
+							<Link
+								href={`/accounting/journals/${journal.id}`}
+								className={buttonVariants({ variant: 'secondary', size: 'sm' })}
+							>
+								Clear
+							</Link>
+						</div>
+					</form>
+
+					<WorkSurface title="Posted entry activity" isFlush>
+						<div className="rounded-xl bg-surface">
+							<DataTable
+								caption={`Posted activity for ${journal.code} ${journal.name}`}
+								columns={activityColumns}
+								rows={activityResult.data.rows}
+								getRowKey={(entry) => entry.id}
+								getRowHref={(entry) => `/accounting/entries/${entry.id}`}
+								emptyState={
+									<div className="p-5">
+										<EmptyState
+											title="No posted journal entries"
+											description={
+												filters.from || filters.to
+													? 'No posted entries match this date range.'
+													: 'This journal has no posted entries yet.'
+											}
+										/>
+									</div>
+								}
+							/>
+							{activityResult.data.rows.length > 0 && (
+								<Pagination
+									page={activityResult.data.page}
+									pageSize={activityResult.data.pageSize}
+									totalCount={activityResult.data.totalCount}
+									itemNoun="entries"
+									buildHref={(page) => activityHref(journal.id, filters, page)}
+								/>
+							)}
+						</div>
+					</WorkSurface>
+				</>
+			) : activityResult.error.code === 'FORBIDDEN' ? (
+				<ForbiddenState description={activityResult.error.message} />
+			) : (
+				<ErrorState description={activityResult.error.message} />
+			)}
 		</>
 	)
 }

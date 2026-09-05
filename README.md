@@ -8,9 +8,9 @@ a second project root inside it or turn an inspiration project into the applicat
 
 ## Current status
 
-Only the project setup is implemented: Next.js 16.3.4, React 19.2.8, TypeScript, Tailwind,
-linting, formatting, a starter page and an application-only health endpoint. Authentication,
-database integration and all accounting features are still planned, not built.
+The Next.js application setup and pinned local Supabase services are implemented. PostgreSQL,
+Auth, private Storage and captured email run locally through Docker. Authentication workflows,
+database integration and accounting features are not implemented yet.
 
 ## Development
 
@@ -19,13 +19,15 @@ The package manager and dependency versions are pinned in the repository.
 
 ```bash
 pnpm install --frozen-lockfile
+pnpm local:start
 pnpm dev
 ```
 
-Open http://localhost:3000. The starter needs no environment variables or external services.
-Run `pnpm check` for lint, type and formatting checks, then `pnpm build` separately for a
-production build. `pnpm start` serves that build. Do not run development and production builds
-against the same build directory simultaneously.
+Open http://127.0.0.1:3000. Captured Auth email is available at
+http://127.0.0.1:54324. Use `pnpm local:status` to inspect services and `pnpm local:stop` to stop
+them without deleting data. Run `pnpm check` for lint, type and formatting checks, then
+`pnpm build` separately for a production build. `pnpm start` serves that build. Do not run
+development and production builds against the same build directory simultaneously.
 
 The starter's ESLint 9 emits an upstream deprecation warning. Some bundled lint plugins do not
 declare ESLint 10 support yet; review the compatible linting stack before production release.
@@ -37,15 +39,16 @@ Supabase cloud project or external email service is required or configured.
 
 - Next.js, React and TypeScript for the application, including server-side handlers.
 - Tailwind with shared UI components and semantic design tokens.
-- Local Supabase CLI/Docker services for PostgreSQL, password authentication and private Storage.
+- Pinned local Supabase CLI/Docker services for PostgreSQL, password authentication, private
+  Storage and captured email.
 - Prisma for server-side business data access, with persistent local database/image volumes.
 - Login ID/password, Accountant signup, authorized user creation and local password recovery.
 - A captured local email inbox for confirmation and reset links; no real outbound email.
 - Local Next.js for frontend and backend, including a local production-build presentation.
 
-Only the frontend/framework tooling is initialized. Prisma, local services, account workflows
-and data preparation have not been implemented. Initial package/container downloads will be
-prepared before verifying the complete application without external network access.
+Prisma, account workflows and data preparation are not implemented yet. Initial package and
+container downloads must be prepared before verifying the complete application without external
+network access.
 
 A later hosted deployment will use the same business code with reviewed environment settings,
 new secrets, callbacks, email configuration and either fresh data or a controlled migration of

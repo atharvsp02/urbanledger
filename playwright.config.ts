@@ -5,6 +5,9 @@ loadEnvironment({ path: '.env.local', quiet: true })
 
 const baseURL = process.env.APP_URL ?? 'http://127.0.0.1:3000'
 const chromiumExecutable = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH
+// Each checkout serves its own port, so the suite must never reuse another
+// worktree's development server.
+const { hostname, port } = new URL(baseURL)
 
 export default defineConfig({
 	testDir: './tests/e2e',
@@ -31,7 +34,7 @@ export default defineConfig({
 		}
 	],
 	webServer: {
-		command: 'pnpm dev --hostname 127.0.0.1 --port 3000',
+		command: `pnpm dev --hostname ${hostname} --port ${port}`,
 		url: `${baseURL}/api/health`,
 		reuseExistingServer: !process.env.CI,
 		timeout: 120_000

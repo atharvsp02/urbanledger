@@ -1,4 +1,12 @@
-import { BookOpen, LayoutDashboard, NotebookPen, Package, Users } from 'lucide-react'
+import {
+	BookOpen,
+	LayoutDashboard,
+	NotebookPen,
+	Package,
+	Scale,
+	ShoppingCart,
+	Users
+} from 'lucide-react'
 import type { Actor, Capability } from '@/lib/contracts/access'
 import type { ShellNavGroup } from '@/components/app-shell/types'
 
@@ -63,6 +71,33 @@ const NAV_DEFINITION: readonly NavDefinition[] = [
 				icon: <NotebookPen className="size-4" />,
 				href: '/accounting/journals',
 				capability: 'masters:read'
+			},
+			{
+				id: 'entries',
+				label: 'Journal entries',
+				icon: <NotebookPen className="size-4" />,
+				href: '/accounting/entries',
+				capability: 'transactions:read'
+			},
+			{
+				id: 'trial-balance',
+				label: 'Trial balance',
+				icon: <Scale className="size-4" />,
+				href: '/reports/trial-balance',
+				capability: 'reports:read'
+			}
+		]
+	},
+	{
+		id: 'purchases',
+		label: 'Purchases',
+		items: [
+			{
+				id: 'purchase-orders',
+				label: 'Purchase orders',
+				icon: <ShoppingCart className="size-4" />,
+				href: '/purchases/orders',
+				capability: 'transactions:read'
 			}
 		]
 	}

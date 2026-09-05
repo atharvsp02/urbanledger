@@ -170,3 +170,19 @@ async function assertProductExists(
 		throw new ApplicationError('NOT_FOUND', 'This product does not exist.')
 	}
 }
+
+export async function listSelectableProducts() {
+	const actor = await requireActor('masters:read')
+	const rows = await getPrisma().product.findMany({
+		where: { businessId: actor.businessId, archivedAt: null },
+		select: { id: true, name: true, sku: true, purchaseCost: true },
+		orderBy: [{ name: 'asc' }, { id: 'asc' }]
+	})
+
+	return rows.map((product) => ({
+		id: product.id,
+		name: product.name,
+		sku: product.sku,
+		purchaseCost: decimalToString(product.purchaseCost)
+	}))
+}

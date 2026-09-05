@@ -176,3 +176,14 @@ async function assertContactExists(
 		throw new ApplicationError('NOT_FOUND', 'This contact does not exist.')
 	}
 }
+
+export async function listSelectableVendors() {
+	const actor = await requireActor('contacts:read')
+	const rows = await getPrisma().contact.findMany({
+		where: { businessId: actor.businessId, archivedAt: null, kind: { in: ['VENDOR', 'BOTH'] } },
+		select: { id: true, name: true, kind: true },
+		orderBy: [{ name: 'asc' }, { id: 'asc' }]
+	})
+
+	return rows
+}

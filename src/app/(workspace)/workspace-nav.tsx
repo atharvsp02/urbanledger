@@ -3,11 +3,13 @@ import {
 	LayoutDashboard,
 	NotebookPen,
 	Package,
+	PackageCheck,
 	Percent,
 	Scale,
-	Tags,
 	ShoppingCart,
-	Users
+	Tags,
+	Users,
+	Warehouse
 } from 'lucide-react'
 import type { Actor, Capability } from '@/lib/contracts/access'
 import type { ShellNavGroup } from '@/components/app-shell/types'
@@ -113,6 +115,26 @@ const NAV_DEFINITION: readonly NavDefinition[] = [
 				label: 'Purchase orders',
 				icon: <ShoppingCart className="size-4" />,
 				href: '/purchases/orders',
+				capability: 'transactions:read'
+			},
+			{
+				id: 'purchase-receipts',
+				label: 'Receipts',
+				icon: <PackageCheck className="size-4" />,
+				href: '/purchases/receipts',
+				capability: 'transactions:read'
+			}
+		]
+	},
+	{
+		id: 'inventory',
+		label: 'Inventory',
+		items: [
+			{
+				id: 'stock',
+				label: 'Stock',
+				icon: <Warehouse className="size-4" />,
+				href: '/stock',
 				capability: 'transactions:read'
 			}
 		]

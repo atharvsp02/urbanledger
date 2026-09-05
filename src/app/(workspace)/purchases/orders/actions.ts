@@ -4,15 +4,18 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import type { ActionResult } from '@/lib/contracts/errors'
 import type { PurchaseOrderDetail } from '@/lib/contracts/purchase-order'
+import type { PurchaseReceiptDetail } from '@/lib/contracts/purchase-receipt'
 import { getActor } from '@/server/auth/actor'
 import {
 	cancelPurchaseOrder,
 	confirmPurchaseOrder,
 	createPurchaseOrder,
+	receivePurchaseOrder,
 	updateDraftPurchaseOrder
 } from '@/server/purchasing'
 
 export type PurchaseOrderActionState = ActionResult<PurchaseOrderDetail> | null
+export type ReceiptActionState = ActionResult<PurchaseReceiptDetail> | null
 
 function readLines(formData: FormData) {
 	const productIds = formData.getAll('lineProductId').map(String)
@@ -96,4 +99,27 @@ export async function cancelPurchaseOrderAction(
 
 	revalidatePath('/purchases/orders')
 	revalidatePath(`/purchases/orders/${purchaseOrderId}`)
+}
+
+export async function receivePurchaseOrderAction(
+	_state: ReceiptActionState,
+	formData: FormData
+): Promise<ReceiptActionState> {
+	const actor = await getActor()
+	const purchaseOrderId = String(formData.get('purchaseOrderId') ?? '')
+	const result = await receivePurchaseOrder(actor, {
+		operationKey: String(formData.get('operationKey') ?? ''),
+		purchaseOrderId,
+		expectedRevision: Number(formData.get('expectedRevision') ?? '0'),
+		receiptDate: String(formData.get('receiptDate') ?? '')
+	})
+
+	if (result.ok) {
+		revalidatePath('/purchases/receipts')
+		revalidatePath('/stock')
+		revalidatePath(`/purchases/orders/${purchaseOrderId}`)
+		redirect(`/purchases/receipts/${result.data.id}`)
+	}
+
+	return result
 }

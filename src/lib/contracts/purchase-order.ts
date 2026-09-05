@@ -81,6 +81,19 @@ export const purchaseOrderDetailSchema = z.object({
 	createdBy: z.object({ id: z.uuid(), displayName: z.string() }),
 	createdAt: z.iso.datetime(),
 	updatedAt: z.iso.datetime(),
+	// Defaults keep results stored by earlier operations parseable on replay.
+	receipt: z
+		.object({ id: z.uuid(), receiptNumber: z.string(), receiptDate: z.iso.date() })
+		.nullable()
+		.default(null),
+	vendorBill: z
+		.object({
+			id: z.uuid(),
+			billNumber: z.string(),
+			state: z.enum(['DRAFT', 'POSTED', 'CANCELLED'])
+		})
+		.nullable()
+		.default(null),
 	lines: z.array(purchaseOrderLineSchema)
 })
 
@@ -91,7 +104,7 @@ export type GetPurchaseOrderInput = z.input<typeof getPurchaseOrderInputSchema>
 export type PurchaseOrderListInput = z.input<typeof purchaseOrderListInputSchema>
 export type PurchaseOrderDetail = z.output<typeof purchaseOrderDetailSchema>
 export type PurchaseOrderLine = z.output<typeof purchaseOrderLineSchema>
-export type PurchaseOrderSummary = Omit<PurchaseOrderDetail, 'lines'>
+export type PurchaseOrderSummary = Omit<PurchaseOrderDetail, 'lines' | 'receipt' | 'vendorBill'>
 
 export type PurchaseOrderListResult = {
 	rows: PurchaseOrderSummary[]

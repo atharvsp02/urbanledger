@@ -72,6 +72,28 @@ enum FinancialDocumentState {
   CANCELLED
 }
 
+enum PaymentDirection {
+  CUSTOMER_INCOMING
+  VENDOR_OUTGOING
+}
+
+enum PaymentSourceMode {
+  STAFF
+  PORTAL_SIMULATION
+}
+
+enum PaymentStatus {
+  POSTED
+  REVERSED
+}
+
+enum PaymentAttemptStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+  CANCELLED
+}
+
 enum AccountType {
   ASSET
   LIABILITY
@@ -160,6 +182,8 @@ model Business {
   salesDeliveries      SalesDelivery[]
   inventoryMovements   InventoryMovement[]
   financialDocuments   FinancialDocument[]
+  paymentAttempts      PaymentAttempt[]
+  payments             Payment[]
   ledgerAccounts       LedgerAccount[]
   journals             Journal[]
   taxes                Tax[]
@@ -196,6 +220,10 @@ model ApplicationUser {
   createdPurchaseReceipts   PurchaseReceipt[]       @relation("PurchaseReceiptCreator")
   createdSalesDeliveries    SalesDelivery[]         @relation("SalesDeliveryCreator")
   createdFinancialDocuments FinancialDocument[]     @relation("FinancialDocumentCreator")
+  createdPaymentAttempts    PaymentAttempt[]        @relation("PaymentAttemptCreator")
+  createdPayments           Payment[]               @relation("PaymentCreator")
+  reversedPayments          Payment[]               @relation("PaymentReverser")
+  allocationReversals       AllocationReversal[]    @relation("AllocationReversalCreator")
   createdEntries            JournalEntry[]          @relation("EntryCreator")
   commandOperations         CommandOperation[]      @relation("CommandActor")
   auditEvents               AuditEvent[]            @relation("AuditActor")
@@ -289,6 +317,8 @@ model Contact {
   purchaseReceipts   PurchaseReceipt[]
   salesDeliveries    SalesDelivery[]
   financialDocuments FinancialDocument[]
+  paymentAttempts    PaymentAttempt[]
+  payments           Payment[]
 
   @@index([businessId, kind, archivedAt])
   @@index([businessId, name])
@@ -520,15 +550,21 @@ model FinancialDocument {
   total                     Decimal                 @db.Decimal(20, 2)
   revision                  Int                     @default(1)
   journalEntryId            String?                 @unique @db.Uuid
+  reversalEntryId           String?                 @unique @db.Uuid
+  reversedAt                DateTime?               @db.Timestamptz(6)
+  reversalReason            String?                 @db.VarChar(240)
   createdById               String                  @db.Uuid
   createdAt                 DateTime                @default(now()) @db.Timestamptz(6)
   updatedAt                 DateTime                @updatedAt @db.Timestamptz(6)
   business                  Business                @relation(fields: [businessId], references: [id], onDelete: Restrict)
   contact                   Contact                 @relation(fields: [contactId], references: [id], onDelete: Restrict)
   sourceOrder               Order                   @relation(fields: [sourceOrderId], references: [id], onDelete: Restrict)
-  journalEntry              JournalEntry?           @relation(fields: [journalEntryId], references: [id], onDelete: Restrict)
+  journalEntry              JournalEntry?           @relation("FinancialDocumentPosting", fields: [journalEntryId], references: [id], onDelete: Restrict)
+  reversalEntry             JournalEntry?           @relation("FinancialDocumentReversal", fields: [reversalEntryId], references: [id], onDelete: Restrict)
   createdBy                 ApplicationUser         @relation("FinancialDocumentCreator", fields: [createdById], references: [id], onDelete: Restrict)
   lines                     FinancialDocumentLine[]
+  paymentAttempts           PaymentAttempt[]
+  allocations               PaymentAllocation[]
 
   @@unique([businessId, kind, number])
   @@index([businessId, kind, state, documentDate])
@@ -614,6 +650,7 @@ model Journal {
   defaultControlAccount     LedgerAccount? @relation("JournalControlAccount", fields: [defaultControlAccountId], references: [id], onDelete: Restrict)
   defaultLiquidityAccount   LedgerAccount? @relation("JournalLiquidityAccount", fields: [defaultLiquidityAccountId], references: [id], onDelete: Restrict)
   entries                   JournalEntry[]
+  payments                  Payment[]
 
   @@unique([businessId, code])
   @@index([businessId, type, archivedAt])
@@ -716,26 +753,29 @@ model FileAsset {
 }
 
 model JournalEntry {
-  id                String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  businessId        String             @db.Uuid
-  journalId         String             @db.Uuid
-  postingDate       DateTime           @db.Date
-  reference         String             @db.VarChar(160)
-  state             EntryState         @default(DRAFT)
-  source            EntrySource
-  sourceReference   String?            @db.Uuid
-  reversalOfEntryId String?            @unique @db.Uuid
-  createdById       String             @db.Uuid
-  postedAt          DateTime?          @db.Timestamptz(6)
-  createdAt         DateTime           @default(now()) @db.Timestamptz(6)
-  updatedAt         DateTime           @updatedAt @db.Timestamptz(6)
-  business          Business           @relation(fields: [businessId], references: [id], onDelete: Restrict)
-  journal           Journal            @relation(fields: [journalId], references: [id], onDelete: Restrict)
-  createdBy         ApplicationUser    @relation("EntryCreator", fields: [createdById], references: [id], onDelete: Restrict)
-  reversalOf        JournalEntry?      @relation("EntryReversal", fields: [reversalOfEntryId], references: [id], onDelete: Restrict)
-  reversedBy        JournalEntry?      @relation("EntryReversal")
-  items             JournalItem[]
-  financialDocument FinancialDocument?
+  id                        String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  businessId                String             @db.Uuid
+  journalId                 String             @db.Uuid
+  postingDate               DateTime           @db.Date
+  reference                 String             @db.VarChar(160)
+  state                     EntryState         @default(DRAFT)
+  source                    EntrySource
+  sourceReference           String?            @db.Uuid
+  reversalOfEntryId         String?            @unique @db.Uuid
+  createdById               String             @db.Uuid
+  postedAt                  DateTime?          @db.Timestamptz(6)
+  createdAt                 DateTime           @default(now()) @db.Timestamptz(6)
+  updatedAt                 DateTime           @updatedAt @db.Timestamptz(6)
+  business                  Business           @relation(fields: [businessId], references: [id], onDelete: Restrict)
+  journal                   Journal            @relation(fields: [journalId], references: [id], onDelete: Restrict)
+  createdBy                 ApplicationUser    @relation("EntryCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  reversalOf                JournalEntry?      @relation("EntryReversal", fields: [reversalOfEntryId], references: [id], onDelete: Restrict)
+  reversedBy                JournalEntry?      @relation("EntryReversal")
+  items                     JournalItem[]
+  financialDocument         FinancialDocument? @relation("FinancialDocumentPosting")
+  reversedFinancialDocument FinancialDocument? @relation("FinancialDocumentReversal")
+  payment                   Payment?           @relation("PaymentPosting")
+  reversedPayment           Payment?           @relation("PaymentReversal")
 
   @@index([businessId, postingDate, state])
   @@index([journalId, postingDate])
@@ -761,6 +801,102 @@ model JournalItem {
   @@index([accountId, entryId])
   @@index([contactId])
   @@map("journal_items")
+}
+
+model PaymentAttempt {
+  id                       String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  businessId               String               @db.Uuid
+  documentId               String               @db.Uuid
+  contactId                String               @db.Uuid
+  direction                PaymentDirection
+  sourceMode               PaymentSourceMode    @default(PORTAL_SIMULATION)
+  status                   PaymentAttemptStatus @default(PENDING)
+  amount                   Decimal              @db.Decimal(20, 2)
+  paymentDate              DateTime             @db.Date
+  failureCode              String?              @db.VarChar(64)
+  expectedDocumentRevision Int
+  revision                 Int                  @default(1)
+  createdById              String               @db.Uuid
+  createdAt                DateTime             @default(now()) @db.Timestamptz(6)
+  updatedAt                DateTime             @updatedAt @db.Timestamptz(6)
+  business                 Business             @relation(fields: [businessId], references: [id], onDelete: Restrict)
+  document                 FinancialDocument    @relation(fields: [documentId], references: [id], onDelete: Restrict)
+  contact                  Contact              @relation(fields: [contactId], references: [id], onDelete: Restrict)
+  createdBy                ApplicationUser      @relation("PaymentAttemptCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  payment                  Payment?
+
+  @@index([businessId, status, createdAt])
+  @@index([documentId, createdAt])
+  @@map("payment_attempts")
+}
+
+model Payment {
+  id                  String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  businessId          String              @db.Uuid
+  contactId           String              @db.Uuid
+  journalId           String              @db.Uuid
+  paymentAttemptId    String?             @unique @db.Uuid
+  direction           PaymentDirection
+  sourceMode          PaymentSourceMode
+  status              PaymentStatus       @default(POSTED)
+  number              String              @db.VarChar(40)
+  paymentDate         DateTime            @db.Date
+  amount              Decimal             @db.Decimal(20, 2)
+  contactNameSnapshot String              @db.VarChar(160)
+  externalReference   String?             @db.VarChar(160)
+  journalEntryId      String              @unique @db.Uuid
+  reversalEntryId     String?             @unique @db.Uuid
+  reversalDate        DateTime?           @db.Date
+  reversalReason      String?             @db.VarChar(240)
+  revision            Int                 @default(1)
+  createdById         String              @db.Uuid
+  reversedById        String?             @db.Uuid
+  createdAt           DateTime            @default(now()) @db.Timestamptz(6)
+  updatedAt           DateTime            @updatedAt @db.Timestamptz(6)
+  business            Business            @relation(fields: [businessId], references: [id], onDelete: Restrict)
+  contact             Contact             @relation(fields: [contactId], references: [id], onDelete: Restrict)
+  journal             Journal             @relation(fields: [journalId], references: [id], onDelete: Restrict)
+  paymentAttempt      PaymentAttempt?     @relation(fields: [paymentAttemptId], references: [id], onDelete: Restrict)
+  journalEntry        JournalEntry        @relation("PaymentPosting", fields: [journalEntryId], references: [id], onDelete: Restrict)
+  reversalEntry       JournalEntry?       @relation("PaymentReversal", fields: [reversalEntryId], references: [id], onDelete: Restrict)
+  createdBy           ApplicationUser     @relation("PaymentCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  reversedBy          ApplicationUser?    @relation("PaymentReverser", fields: [reversedById], references: [id], onDelete: Restrict)
+  allocations         PaymentAllocation[]
+
+  @@unique([businessId, direction, number])
+  @@index([businessId, direction, paymentDate])
+  @@index([contactId, paymentDate])
+  @@map("payments")
+}
+
+model PaymentAllocation {
+  id            String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  paymentId     String              @db.Uuid
+  documentId    String              @db.Uuid
+  amount        Decimal             @db.Decimal(20, 2)
+  effectiveDate DateTime            @db.Date
+  createdAt     DateTime            @default(now()) @db.Timestamptz(6)
+  payment       Payment             @relation(fields: [paymentId], references: [id], onDelete: Restrict)
+  document      FinancialDocument   @relation(fields: [documentId], references: [id], onDelete: Restrict)
+  reversal      AllocationReversal?
+
+  @@unique([paymentId, documentId])
+  @@index([documentId, effectiveDate])
+  @@map("payment_allocations")
+}
+
+model AllocationReversal {
+  id            String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  allocationId  String            @unique @db.Uuid
+  amount        Decimal           @db.Decimal(20, 2)
+  effectiveDate DateTime          @db.Date
+  createdById   String            @db.Uuid
+  createdAt     DateTime          @default(now()) @db.Timestamptz(6)
+  allocation    PaymentAllocation @relation(fields: [allocationId], references: [id], onDelete: Restrict)
+  createdBy     ApplicationUser   @relation("AllocationReversalCreator", fields: [createdById], references: [id], onDelete: Restrict)
+
+  @@index([effectiveDate])
+  @@map("allocation_reversals")
 }
 
 model DocumentSequence {

@@ -8,6 +8,8 @@ import { ApplicationError } from '@/server/errors/application-error'
 
 type CommandTransaction = Prisma.TransactionClient
 
+type AuthorizedBusiness = { accountingLockDate: Date | null; timezone: string }
+
 const maximumTransactionAttempts = 10
 
 export function canonicalRequestHash(payload: object) {
@@ -34,6 +36,11 @@ export async function executeIdempotentOperation<T>(input: {
 	requestHash: string
 	parseStoredResult: (value: unknown) => T | null
 	resourceId: (result: T) => string
+	authorize?: (
+		transaction: CommandTransaction,
+		actor: Actor,
+		capability: Capability
+	) => Promise<AuthorizedBusiness>
 	command: (
 		transaction: CommandTransaction,
 		accountingLockDate: Date | null,
@@ -46,11 +53,9 @@ export async function executeIdempotentOperation<T>(input: {
 		try {
 			return await database.$transaction(
 				async (transaction) => {
-					const business = await requireCurrentAccountingActor(
-						transaction,
-						input.actor,
-						input.capability
-					)
+					const business = input.authorize
+						? await input.authorize(transaction, input.actor, input.capability)
+						: await requireCurrentAccountingActor(transaction, input.actor, input.capability)
 					const existing = await transaction.commandOperation.findUnique({
 						where: {
 							businessId_operationKey: {

@@ -63,6 +63,7 @@ export async function commitPostedJournalEntry(
 		reference: string
 		source: EntrySource
 		sourceReference: string | null
+		reversalOfEntryId?: string | null
 		createdById: string
 		lines: PostedJournalLine[]
 	}
@@ -106,6 +107,7 @@ export async function commitPostedJournalEntry(
 			reference: input.reference,
 			source: input.source,
 			sourceReference: input.sourceReference,
+			reversalOfEntryId: input.reversalOfEntryId ?? null,
 			createdById: input.createdById
 		},
 		select: { id: true }

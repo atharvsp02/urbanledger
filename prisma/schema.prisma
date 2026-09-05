@@ -50,6 +50,17 @@ enum ProductKind {
   COMBO
 }
 
+enum OrderKind {
+  PURCHASE
+  SALES
+}
+
+enum OrderState {
+  DRAFT
+  CONFIRMED
+  CANCELLED
+}
+
 enum AccountType {
   ASSET
   LIABILITY
@@ -104,6 +115,8 @@ enum EntrySource {
 }
 
 enum SequenceKind {
+  PURCHASE_ORDER
+  SALES_ORDER
   CUSTOMER_INVOICE
   VENDOR_BILL
   CUSTOMER_PAYMENT
@@ -129,6 +142,7 @@ model Business {
   contacts             Contact[]
   productCategories    ProductCategory[]
   products             Product[]
+  orders               Order[]
   ledgerAccounts       LedgerAccount[]
   journals             Journal[]
   taxes                Tax[]
@@ -161,6 +175,7 @@ model ApplicationUser {
   issuedPortalAccess     PortalAccess[]          @relation("PortalIssuer")
   provisioningOperations ProvisioningOperation[] @relation("ProvisioningActor")
   responsibleBudgets     Budget[]                @relation("BudgetResponsible")
+  createdOrders          Order[]                 @relation("OrderCreator")
   createdEntries         JournalEntry[]          @relation("EntryCreator")
   commandOperations      CommandOperation[]      @relation("CommandActor")
   auditEvents            AuditEvent[]            @relation("AuditActor")
@@ -250,6 +265,7 @@ model Contact {
   imageAsset   FileAsset?    @relation("ContactImage", fields: [imageAssetId], references: [id], onDelete: SetNull)
   portalAccess PortalAccess?
   journalItems JournalItem[]
+  orders       Order[]
 
   @@index([businessId, kind, archivedAt])
   @@index([businessId, name])
@@ -285,10 +301,52 @@ model Product {
   updatedAt    DateTime        @updatedAt @db.Timestamptz(6)
   business     Business        @relation(fields: [businessId], references: [id], onDelete: Restrict)
   category     ProductCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  orderLines   OrderLine[]
 
   @@unique([businessId, sku])
   @@index([businessId, kind, archivedAt])
   @@map("products")
+}
+
+model Order {
+  id          String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  businessId  String          @db.Uuid
+  kind        OrderKind
+  contactId   String          @db.Uuid
+  number      String          @db.VarChar(40)
+  orderDate   DateTime        @db.Date
+  state       OrderState      @default(DRAFT)
+  total       Decimal         @db.Decimal(20, 2)
+  revision    Int             @default(1)
+  createdById String          @db.Uuid
+  createdAt   DateTime        @default(now()) @db.Timestamptz(6)
+  updatedAt   DateTime        @updatedAt @db.Timestamptz(6)
+  business    Business        @relation(fields: [businessId], references: [id], onDelete: Restrict)
+  contact     Contact         @relation(fields: [contactId], references: [id], onDelete: Restrict)
+  createdBy   ApplicationUser @relation("OrderCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  lines       OrderLine[]
+
+  @@unique([businessId, kind, number])
+  @@index([businessId, kind, state, orderDate])
+  @@index([contactId])
+  @@map("orders")
+}
+
+model OrderLine {
+  id                  String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orderId             String  @db.Uuid
+  productId           String  @db.Uuid
+  productNameSnapshot String  @db.VarChar(160)
+  quantity            Decimal @db.Decimal(16, 4)
+  unitPriceSnapshot   Decimal @db.Decimal(20, 4)
+  lineTotal           Decimal @db.Decimal(20, 2)
+  position            Int
+  order               Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product             Product @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  @@unique([orderId, position])
+  @@index([productId])
+  @@map("order_lines")
 }
 
 model LedgerAccount {

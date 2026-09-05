@@ -10,7 +10,10 @@ import { getActor } from '@/server/auth/actor'
 import { getPurchaseOrder } from '@/server/purchasing'
 import { OrderStateBadge } from '@/app/(workspace)/purchases/orders/order-state-badge'
 import { TransitionControls } from '@/app/(workspace)/purchases/orders/[id]/transition-controls'
-import { ReceiptControl } from '@/app/(workspace)/purchases/orders/[id]/fulfilment-controls'
+import {
+	ReceiptControl,
+	VendorBillControl
+} from '@/app/(workspace)/purchases/orders/[id]/fulfilment-controls'
 
 export default async function PurchaseOrderDetailPage({
 	params
@@ -151,6 +154,32 @@ export default async function PurchaseOrderDetailPage({
 								.
 							</p>
 						)}
+
+						{order.receipt != null &&
+							(order.vendorBill == null ? (
+								canTransact ? (
+									<VendorBillControl
+										purchaseOrderId={order.id}
+										revision={order.revision}
+										receiptDate={order.receipt.receiptDate}
+									/>
+								) : (
+									<p className="text-sm text-muted-foreground">
+										No vendor bill has been generated for this order.
+									</p>
+								)
+							) : (
+								<p className="text-sm">
+									Billed as{' '}
+									<Link
+										href={`/purchases/bills/${order.vendorBill.id}`}
+										className="text-accent hover:underline"
+									>
+										{order.vendorBill.billNumber}
+									</Link>
+									.
+								</p>
+							))}
 					</div>
 				</WorkSurface>
 			)}

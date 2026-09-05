@@ -5,6 +5,7 @@ import {
 	Package,
 	PackageCheck,
 	Percent,
+	ReceiptText,
 	Scale,
 	ShoppingCart,
 	Tags,
@@ -122,6 +123,13 @@ const NAV_DEFINITION: readonly NavDefinition[] = [
 				label: 'Receipts',
 				icon: <PackageCheck className="size-4" />,
 				href: '/purchases/receipts',
+				capability: 'transactions:read'
+			},
+			{
+				id: 'vendor-bills',
+				label: 'Vendor bills',
+				icon: <ReceiptText className="size-4" />,
+				href: '/purchases/bills',
 				capability: 'transactions:read'
 			}
 		]

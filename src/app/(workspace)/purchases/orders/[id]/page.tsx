@@ -10,6 +10,10 @@ import { getActor } from '@/server/auth/actor'
 import { getPurchaseOrder } from '@/server/purchasing'
 import { OrderStateBadge } from '@/app/(workspace)/purchases/orders/order-state-badge'
 import { TransitionControls } from '@/app/(workspace)/purchases/orders/[id]/transition-controls'
+import {
+	ReceiptControl,
+	VendorBillControl
+} from '@/app/(workspace)/purchases/orders/[id]/fulfilment-controls'
 
 export default async function PurchaseOrderDetailPage({
 	params
@@ -28,6 +32,8 @@ export default async function PurchaseOrderDetailPage({
 	const order = result.data
 	const isDraft = order.state === 'DRAFT'
 	const canTransact = actor.capabilities.includes('transactions:create')
+	const isConfirmed = order.state === 'CONFIRMED'
+	const hasGoodsLines = order.lines.length > 0
 
 	const columns: readonly TableColumn<PurchaseOrderLine>[] = [
 		{ id: 'product', header: 'Product', cell: (line) => line.productName },
@@ -116,6 +122,67 @@ export default async function PurchaseOrderDetailPage({
 					</p>
 				</WorkSurface>
 			</div>
+
+			{isConfirmed && (
+				<WorkSurface
+					title="Fulfilment"
+					description="Receipts record arrival and acceptance. Only a posted vendor bill reaches the ledger."
+				>
+					<div className="flex flex-col gap-5">
+						{order.receipt == null ? (
+							canTransact ? (
+								<ReceiptControl
+									purchaseOrderId={order.id}
+									revision={order.revision}
+									orderDate={order.orderDate}
+									hasGoodsLines={hasGoodsLines}
+								/>
+							) : (
+								<p className="text-sm text-muted-foreground">
+									This order has not been received yet.
+								</p>
+							)
+						) : (
+							<p className="text-sm">
+								Received on {formatBusinessDate(order.receipt.receiptDate)} as{' '}
+								<Link
+									href={`/purchases/receipts/${order.receipt.id}`}
+									className="text-accent hover:underline"
+								>
+									{order.receipt.receiptNumber}
+								</Link>
+								.
+							</p>
+						)}
+
+						{order.receipt != null &&
+							(order.vendorBill == null ? (
+								canTransact ? (
+									<VendorBillControl
+										purchaseOrderId={order.id}
+										revision={order.revision}
+										receiptDate={order.receipt.receiptDate}
+									/>
+								) : (
+									<p className="text-sm text-muted-foreground">
+										No vendor bill has been generated for this order.
+									</p>
+								)
+							) : (
+								<p className="text-sm">
+									Billed as{' '}
+									<Link
+										href={`/purchases/bills/${order.vendorBill.id}`}
+										className="text-accent hover:underline"
+									>
+										{order.vendorBill.billNumber}
+									</Link>
+									.
+								</p>
+							))}
+					</div>
+				</WorkSurface>
+			)}
 
 			<div className="rounded-xl border border-border bg-surface">
 				<DataTable

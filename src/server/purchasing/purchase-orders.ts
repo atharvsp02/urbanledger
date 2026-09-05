@@ -227,6 +227,19 @@ async function loadPurchaseOrderDetail(
 		where: { orderId: order.id },
 		orderBy: [{ position: 'asc' }, { id: 'asc' }]
 	})
+	const receipt = await transaction.purchaseReceipt.findFirst({
+		where: { orderId: order.id, businessId },
+		select: { id: true, number: true, receiptDate: true }
+	})
+	const vendorBill = await transaction.financialDocument.findFirst({
+		where: {
+			sourceOrderId: order.id,
+			businessId,
+			kind: 'VENDOR_BILL',
+			state: { not: 'CANCELLED' }
+		},
+		select: { id: true, number: true, state: true }
+	})
 
 	if (!vendor || !creator) {
 		throw new ApplicationError('INVALID_STATE', 'The purchase order has an invalid owner.')
@@ -244,6 +257,18 @@ async function loadPurchaseOrderDetail(
 		createdBy: creator,
 		createdAt: order.createdAt.toISOString(),
 		updatedAt: order.updatedAt.toISOString(),
+		receipt:
+			receipt == null
+				? null
+				: {
+						id: receipt.id,
+						receiptNumber: receipt.number,
+						receiptDate: dateOnly(receipt.receiptDate)
+					},
+		vendorBill:
+			vendorBill == null
+				? null
+				: { id: vendorBill.id, billNumber: vendorBill.number, state: vendorBill.state },
 		lines: lines.map((line) => ({
 			id: line.id,
 			position: line.position,

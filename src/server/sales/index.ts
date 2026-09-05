@@ -15,3 +15,12 @@ export {
 	listInventoryMovements,
 	listSalesDeliveries
 } from '@/server/sales/sales-deliveries'
+export {
+	cancelDraftCustomerInvoice,
+	createCustomerInvoiceFromSalesOrder,
+	getCustomerInvoice,
+	getCustomerInvoiceOptions,
+	listCustomerInvoices,
+	postCustomerInvoice,
+	updateDraftCustomerInvoice
+} from '@/server/sales/customer-invoices'

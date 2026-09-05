@@ -30,6 +30,7 @@
 		"test:ledger-activity": "node --conditions=react-server --import tsx --test --test-concurrency=1 tests/accounting/ledger-activity.test.ts",
 		"test:purchase-orders": "node --conditions=react-server --import tsx --test --test-concurrency=1 tests/purchasing/purchase-orders.test.ts",
 		"test:purchase-workflow": "node --conditions=react-server --import tsx --test --test-concurrency=1 tests/purchasing/purchase-workflow.test.ts",
+		"test:sales-workflow": "node --conditions=react-server --import tsx --test --test-concurrency=1 tests/sales/sales-workflow.test.ts",
 		"test:e2e": "playwright test"
 	},
 	"dependencies": {

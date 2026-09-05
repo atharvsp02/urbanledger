@@ -1,0 +1,17 @@
+inspiration/
+docs/
+AGENTS.md
+CLAUDE.md
+node_modules/
+.next/
+out/
+build/
+dist/
+coverage/
+next-env.d.ts
+pnpm-lock.yaml
+.env*
+.vercel/
+.claude-logs/
+test-results/
+playwright-report/

@@ -4,12 +4,15 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import type { ActionResult } from '@/lib/contracts/errors'
 import { contactInputSchema, type ContactKind } from '@/lib/masters/contact'
+import { contactAccessInputSchema } from '@/lib/masters/contact-access'
+import { enableContactPortalAccess } from '@/server/masters/contact-access'
 import { removeContactImage, replaceContactImage } from '@/server/masters/contact-images'
 import { createContact, setContactArchived, updateContact } from '@/server/masters/contacts'
 import { toActionResult } from '@/server/actions/result'
 
 export type ContactActionState = ActionResult<{ id: string }> | null
 export type ContactImageState = ActionResult<{ id: string }> | null
+export type ContactAccessState = ActionResult<{ contactId: string; loginId: string }> | null
 
 function readContactInput(formData: FormData) {
 	const read = (key: string) => String(formData.get(key) ?? '')
@@ -82,6 +85,30 @@ export async function saveContactImageAction(
 		await replaceContactImage(contactId, file)
 		return { id: contactId }
 	})
+
+	if (result.ok) {
+		revalidatePath(`/contacts/${contactId}`)
+	}
+
+	return result
+}
+
+export async function enableContactAccessAction(
+	_state: ContactAccessState,
+	formData: FormData
+): Promise<ContactAccessState> {
+	const contactId = String(formData.get('contactId') ?? '')
+	const result = await toActionResult(() =>
+		enableContactPortalAccess(
+			contactAccessInputSchema.parse({
+				contactId,
+				loginId: String(formData.get('loginId') ?? ''),
+				email: String(formData.get('email') ?? ''),
+				password: String(formData.get('password') ?? ''),
+				passwordConfirmation: String(formData.get('passwordConfirmation') ?? '')
+			})
+		)
+	)
 
 	if (result.ok) {
 		revalidatePath(`/contacts/${contactId}`)

@@ -13,6 +13,7 @@ import { getContactDetail } from '@/server/masters/contacts'
 import { ApplicationError } from '@/server/errors/application-error'
 import { ArchiveControl } from '@/app/(workspace)/contacts/[id]/archive-control'
 import { ContactImage } from '@/app/(workspace)/contacts/[id]/contact-image'
+import { PortalAccessForm } from '@/app/(workspace)/contacts/[id]/portal-access-form'
 import { PortalStateBadge } from '@/app/(workspace)/contacts/portal-state-badge'
 
 export default async function ContactDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -30,6 +31,7 @@ export default async function ContactDetailPage({ params }: { params: Promise<{ 
 	const image = await getContactImage(id)
 	const canUpdate = actor.capabilities.includes('contacts:update')
 	const canArchive = actor.capabilities.includes('masters:archive')
+	const canGrantAccess = actor.capabilities.includes('contact-access:create')
 
 	const details: readonly { label: string; value: string }[] = [
 		{ label: 'Type', value: CONTACT_KIND_LABELS[contact.kind] },
@@ -103,6 +105,44 @@ export default async function ContactDetailPage({ params }: { params: Promise<{ 
 					/>
 				</WorkSurface>
 			</div>
+
+			<WorkSurface
+				title="Portal access"
+				description="Portal identities are linked to this contact by its record ID, never by matching email."
+			>
+				{contact.portalState === 'active' && (
+					<p className="text-sm">
+						Signed in with Login ID <strong>{contact.portalLoginId}</strong>.
+					</p>
+				)}
+				{contact.portalState === 'revoked' && (
+					<p className="text-sm text-muted-foreground">
+						Access was revoked. An administrator must restore or replace it.
+					</p>
+				)}
+				{contact.portalState === 'pending' && (
+					<p className="text-sm text-muted-foreground">
+						An identity was created but access is not complete. Retry with the same details.
+					</p>
+				)}
+				{contact.portalState === 'failed' && (
+					<p className="text-sm text-danger">
+						The last attempt failed
+						{contact.portalFailureCode == null ? '' : ` (${contact.portalFailureCode})`}. The
+						contact record was saved. Retry with the same details.
+					</p>
+				)}
+				{canGrantAccess && contact.portalState !== 'active' && contact.portalState !== 'revoked' ? (
+					<div className="mt-4">
+						<PortalAccessForm contactId={contact.id} defaultEmail={contact.email} />
+					</div>
+				) : null}
+				{!canGrantAccess && contact.portalState === 'none' && (
+					<p className="text-sm text-muted-foreground">
+						Portal access has not been enabled for this contact.
+					</p>
+				)}
+			</WorkSurface>
 
 			<WorkSurface title="Related documents">
 				<EmptyState

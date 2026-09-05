@@ -10,6 +10,7 @@ import {
 	type ContactSummary
 } from '@/lib/masters/contact'
 import { requireActor } from '@/server/auth/actor'
+import { contactProvisioningKey } from '@/server/masters/contact-access'
 import { getPrisma } from '@/server/db/prisma'
 import { ApplicationError } from '@/server/errors/application-error'
 import { resolvePage, type PageResult } from '@/server/masters/pagination'
@@ -95,13 +96,18 @@ export async function getContactDetail(contactId: string): Promise<ContactDetail
 		throw new ApplicationError('NOT_FOUND', 'This contact does not exist.')
 	}
 
+	const operation = await prisma.provisioningOperation.findUnique({
+		where: { operationKey: contactProvisioningKey(contactId) }
+	})
+
 	return {
 		...toSummary(contact),
+		portalState: portalStateOf(contact.portalAccess, operation?.state),
 		street: contact.street,
 		pincode: contact.pincode,
 		imageAssetId: contact.imageAssetId,
 		portalLoginId: contact.portalAccess?.user.loginId ?? null,
-		portalFailureCode: null
+		portalFailureCode: operation?.safeFailureCode ?? null
 	}
 }
 

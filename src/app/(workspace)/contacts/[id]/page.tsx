@@ -4,27 +4,38 @@ import { FileText } from 'lucide-react'
 import { PageHeader, WorkSurface } from '@/components/app-shell/page-header'
 import { Badge } from '@/components/ui/badge'
 import { buttonVariants } from '@/components/ui/button'
-import { ContactAvatar } from '@/components/ui/placeholder'
 import { EmptyState } from '@/components/ui/state-panel'
-import { CONTACT_TYPE_LABELS } from '@/lib/masters/contact'
+import { CONTACT_KIND_LABELS } from '@/lib/masters/contact'
 import { formatBusinessDate } from '@/lib/format'
-import { getContact } from '@/server/dev-fixtures/contacts'
+import { getActor } from '@/server/auth/actor'
+import { getContactDetail } from '@/server/masters/contacts'
+import { ApplicationError } from '@/server/errors/application-error'
 import { ArchiveControl } from '@/app/(workspace)/contacts/[id]/archive-control'
-import { FixtureNotice } from '@/app/(workspace)/fixture-notice'
+import { PortalStateBadge } from '@/app/(workspace)/contacts/portal-state-badge'
 
 export default async function ContactDetailPage({ params }: { params: Promise<{ id: string }> }) {
 	const { id } = await params
-	const contact = getContact(id)
-	if (contact == null) notFound()
+	const actor = await getActor()
+	let contact
+
+	try {
+		contact = await getContactDetail(id)
+	} catch (error) {
+		if (error instanceof ApplicationError && error.code === 'NOT_FOUND') notFound()
+		throw error
+	}
+
+	const canUpdate = actor.capabilities.includes('contacts:update')
+	const canArchive = actor.capabilities.includes('masters:archive')
 
 	const details: readonly { label: string; value: string }[] = [
-		{ label: 'Type', value: CONTACT_TYPE_LABELS[contact.type] },
-		{ label: 'Email', value: contact.email },
-		{ label: 'Mobile', value: contact.mobile },
-		{ label: 'Address', value: contact.addressLine },
-		{ label: 'City', value: contact.city },
-		{ label: 'State', value: contact.state },
-		{ label: 'Pincode', value: contact.pincode }
+		{ label: 'Type', value: CONTACT_KIND_LABELS[contact.kind] },
+		{ label: 'Email', value: contact.email ?? '-' },
+		{ label: 'Mobile', value: contact.mobile ?? '-' },
+		{ label: 'Address', value: contact.street ?? '-' },
+		{ label: 'City', value: contact.city ?? '-' },
+		{ label: 'State', value: contact.state ?? '-' },
+		{ label: 'Pincode', value: contact.pincode ?? '-' }
 	]
 
 	return (
@@ -34,28 +45,31 @@ export default async function ContactDetailPage({ params }: { params: Promise<{ 
 				breadcrumbs={[{ label: 'Contacts', href: '/contacts' }, { label: contact.name }]}
 				action={
 					<>
-						<Link
-							href={`/contacts/${contact.id}/edit`}
-							className={buttonVariants({ variant: 'secondary', size: 'sm' })}
-						>
-							Edit
-						</Link>
-						<ArchiveControl
-							contactId={contact.id}
-							contactName={contact.name}
-							isArchived={contact.archivedAt != null}
-						/>
+						{canUpdate && (
+							<Link
+								href={`/contacts/${contact.id}/edit`}
+								className={buttonVariants({ variant: 'secondary', size: 'sm' })}
+							>
+								Edit
+							</Link>
+						)}
+						{canArchive && (
+							<ArchiveControl
+								contactId={contact.id}
+								contactName={contact.name}
+								revision={contact.revision}
+								isArchived={contact.archivedAt != null}
+							/>
+						)}
 					</>
 				}
 			/>
 
-			<FixtureNotice master="contacts" />
-
 			<div className="flex flex-wrap items-center gap-3">
-				<ContactAvatar name={contact.name} />
-				<Badge tone={contact.type === 'vendor' ? 'neutral' : 'accent'}>
-					{CONTACT_TYPE_LABELS[contact.type]}
+				<Badge tone={contact.kind === 'VENDOR' ? 'neutral' : 'accent'}>
+					{CONTACT_KIND_LABELS[contact.kind]}
 				</Badge>
+				<PortalStateBadge state={contact.portalState} />
 				{contact.archivedAt == null ? (
 					<Badge tone="success">Active</Badge>
 				) : (
@@ -76,15 +90,15 @@ export default async function ContactDetailPage({ params }: { params: Promise<{ 
 						))}
 					</dl>
 				</WorkSurface>
-
-				<WorkSurface title="Related documents">
-					<EmptyState
-						icon={FileText}
-						title="No documents yet"
-						description="Sales orders, invoices, bills and payments for this contact appear here once those workflows are built."
-					/>
-				</WorkSurface>
 			</div>
+
+			<WorkSurface title="Related documents">
+				<EmptyState
+					icon={FileText}
+					title="No documents yet"
+					description="Sales orders, invoices, bills and payments for this contact appear here once those workflows are built."
+				/>
+			</WorkSurface>
 		</>
 	)
 }

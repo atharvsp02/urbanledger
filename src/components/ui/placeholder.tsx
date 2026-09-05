@@ -1,18 +1,11 @@
 import { Boxes, Package, Wrench, type LucideIcon } from 'lucide-react'
+import { PRODUCT_KIND_LABELS, type ProductKind } from '@/lib/masters/product'
 import { cn } from '@/lib/cn'
 
-export type ProductKind = 'goods' | 'service' | 'combo'
-
 const PRODUCT_ICONS: Record<ProductKind, LucideIcon> = {
-	goods: Package,
-	service: Wrench,
-	combo: Boxes
-}
-
-const PRODUCT_LABELS: Record<ProductKind, string> = {
-	goods: 'Goods',
-	service: 'Service',
-	combo: 'Combo'
+	GOODS: Package,
+	SERVICE: Wrench,
+	COMBO: Boxes
 }
 
 function initialsOf(name: string): string {
@@ -80,7 +73,7 @@ export function ProductThumbnail({
 	return (
 		<span
 			role="img"
-			aria-label={`${PRODUCT_LABELS[kind]} placeholder`}
+			aria-label={`${PRODUCT_KIND_LABELS[kind]} placeholder`}
 			className={cn(shell, 'bg-surface-soft text-muted-foreground')}
 		>
 			<Icon aria-hidden="true" className="size-5" />

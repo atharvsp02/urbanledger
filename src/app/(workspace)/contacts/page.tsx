@@ -10,45 +10,51 @@ import { Pagination } from '@/components/ui/pagination'
 import { ContactAvatar } from '@/components/ui/placeholder'
 import { SkeletonTable } from '@/components/ui/skeleton'
 import { EmptyState } from '@/components/ui/state-panel'
-import { FixtureNotice } from '@/app/(workspace)/fixture-notice'
 import {
-	CONTACT_TYPES,
-	CONTACT_TYPE_LABELS,
-	type Contact,
-	type ContactType
+	contactKinds,
+	contactSortColumns,
+	CONTACT_KIND_LABELS,
+	CONTACT_SORT_LABELS,
+	type ContactSummary
 } from '@/lib/masters/contact'
-import { listContacts } from '@/server/dev-fixtures/contacts'
+import { listContacts } from '@/server/masters/contacts'
+import { PortalStateBadge } from '@/app/(workspace)/contacts/portal-state-badge'
 
-const PAGE_SIZE = 10
+const PAGE_SIZE = 20
 
-type ContactParams = { q?: string; type?: string; archived?: string; page?: string }
+type ContactParams = {
+	q?: string
+	kind?: string
+	archived?: string
+	sort?: string
+	dir?: string
+	page?: string
+}
+
+function buildHref(params: ContactParams, patch: ContactParams) {
+	const merged = { ...params, ...patch }
+	const query = new URLSearchParams()
+
+	for (const [key, value] of Object.entries(merged)) {
+		if (value != null && value !== '') query.set(key, value)
+	}
+
+	const queryString = query.toString()
+	return queryString === '' ? '/contacts' : `/contacts?${queryString}`
+}
 
 async function ContactsTable({ params }: { params: ContactParams }) {
-	const type: ContactType | 'all' = CONTACT_TYPES.includes(params.type as ContactType)
-		? (params.type as ContactType)
-		: 'all'
-	const includeArchived = params.archived === 'include'
-	const search = params.q ?? ''
-
-	const result = listContacts({
-		search,
-		type,
-		includeArchived,
+	const result = await listContacts({
+		search: params.q ?? '',
+		kind: (params.kind as 'ALL') ?? 'ALL',
+		includeArchived: params.archived === 'include',
+		sort: params.sort as 'name',
+		direction: params.dir === 'desc' ? 'desc' : 'asc',
 		page: Number(params.page ?? '1') || 1,
 		pageSize: PAGE_SIZE
 	})
 
-	const buildHref = (patch: ContactParams) => {
-		const merged = { ...params, ...patch }
-		const query = new URLSearchParams()
-		for (const [key, value] of Object.entries(merged)) {
-			if (value != null && value !== '') query.set(key, value)
-		}
-		const queryString = query.toString()
-		return queryString === '' ? '/contacts' : `/contacts?${queryString}`
-	}
-
-	const columns: readonly TableColumn<Contact>[] = [
+	const columns: readonly TableColumn<ContactSummary>[] = [
 		{
 			id: 'name',
 			header: 'Name',
@@ -57,25 +63,30 @@ async function ContactsTable({ params }: { params: ContactParams }) {
 					<ContactAvatar name={contact.name} className="size-8" />
 					<span className="min-w-0">
 						<span className="block font-medium">{contact.name}</span>
-						<span className="block text-xs text-muted-foreground">{contact.email}</span>
+						<span className="block text-xs text-muted-foreground">{contact.email ?? '-'}</span>
 					</span>
 				</span>
 			)
 		},
 		{
-			id: 'type',
+			id: 'kind',
 			header: 'Type',
 			cell: (contact) => (
-				<Badge tone={contact.type === 'vendor' ? 'neutral' : 'accent'}>
-					{CONTACT_TYPE_LABELS[contact.type]}
+				<Badge tone={contact.kind === 'VENDOR' ? 'neutral' : 'accent'}>
+					{CONTACT_KIND_LABELS[contact.kind]}
 				</Badge>
 			)
 		},
-		{ id: 'mobile', header: 'Mobile', cell: (contact) => contact.mobile },
+		{ id: 'mobile', header: 'Mobile', cell: (contact) => contact.mobile ?? '-' },
 		{
 			id: 'location',
 			header: 'Location',
-			cell: (contact) => `${contact.city}, ${contact.state}`
+			cell: (contact) => [contact.city, contact.state].filter(Boolean).join(', ') || '-'
+		},
+		{
+			id: 'portal',
+			header: 'Portal',
+			cell: (contact) => <PortalStateBadge state={contact.portalState} />
 		},
 		{
 			id: 'status',
@@ -101,9 +112,11 @@ async function ContactsTable({ params }: { params: ContactParams }) {
 					<div className="p-5">
 						<EmptyState
 							icon={Users}
-							title={search === '' ? 'No contacts yet' : 'No contacts match these filters'}
+							title={
+								(params.q ?? '') === '' ? 'No contacts yet' : 'No contacts match these filters'
+							}
 							description={
-								search === ''
+								(params.q ?? '') === ''
 									? 'Add a customer or vendor to start recording orders against it.'
 									: 'Clear the search or choose a different type.'
 							}
@@ -118,10 +131,10 @@ async function ContactsTable({ params }: { params: ContactParams }) {
 			{result.rows.length > 0 && (
 				<Pagination
 					page={result.page}
-					pageSize={PAGE_SIZE}
+					pageSize={result.pageSize}
 					totalCount={result.totalCount}
 					itemNoun="contacts"
-					buildHref={(page) => buildHref({ page: String(page) })}
+					buildHref={(page) => buildHref(params, { page: String(page) })}
 				/>
 			)}
 		</div>
@@ -134,11 +147,6 @@ export default async function ContactsPage({
 	searchParams: Promise<ContactParams>
 }) {
 	const params = await searchParams
-	const type: ContactType | 'all' = CONTACT_TYPES.includes(params.type as ContactType)
-		? (params.type as ContactType)
-		: 'all'
-	const includeArchived = params.archived === 'include'
-	const search = params.q ?? ''
 
 	return (
 		<>
@@ -153,38 +161,54 @@ export default async function ContactsPage({
 				}
 			/>
 
-			<FixtureNotice master="contacts" />
-
 			<ListToolbar
 				action="/contacts"
 				searchLabel="Search contacts"
 				searchPlaceholder="Name, email or city"
-				searchDefaultValue={search}
+				searchDefaultValue={params.q ?? ''}
 				resetHref="/contacts"
 			>
 				<ToolbarFilter
 					label="Type"
-					name="type"
-					defaultValue={type}
+					name="kind"
+					defaultValue={params.kind ?? 'ALL'}
 					options={[
-						{ value: 'all', label: 'All types' },
-						...CONTACT_TYPES.map((value) => ({ value, label: CONTACT_TYPE_LABELS[value] }))
+						{ value: 'ALL', label: 'All types' },
+						...contactKinds.map((value) => ({ value, label: CONTACT_KIND_LABELS[value] }))
 					]}
 				/>
 				<ToolbarFilter
 					label="Archived"
 					name="archived"
-					defaultValue={includeArchived ? 'include' : 'exclude'}
+					defaultValue={params.archived === 'include' ? 'include' : 'exclude'}
 					options={[
 						{ value: 'exclude', label: 'Active only' },
 						{ value: 'include', label: 'Include archived' }
 					]}
 				/>
+				<ToolbarFilter
+					label="Sort by"
+					name="sort"
+					defaultValue={params.sort ?? 'name'}
+					options={contactSortColumns.map((value) => ({
+						value,
+						label: CONTACT_SORT_LABELS[value]
+					}))}
+				/>
+				<ToolbarFilter
+					label="Order"
+					name="dir"
+					defaultValue={params.dir === 'desc' ? 'desc' : 'asc'}
+					options={[
+						{ value: 'asc', label: 'Ascending' },
+						{ value: 'desc', label: 'Descending' }
+					]}
+				/>
 			</ListToolbar>
 
 			<Suspense
-				key={`${search}|${type}|${includeArchived}|${params.page ?? '1'}`}
-				fallback={<SkeletonTable rows={6} columns={5} />}
+				key={`${params.q}|${params.kind}|${params.archived}|${params.sort}|${params.dir}|${params.page}`}
+				fallback={<SkeletonTable rows={6} columns={6} />}
 			>
 				<ContactsTable params={params} />
 			</Suspense>

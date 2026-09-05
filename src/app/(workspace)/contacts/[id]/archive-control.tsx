@@ -6,10 +6,12 @@ import { setContactArchivedAction } from '@/app/(workspace)/contacts/actions'
 export function ArchiveControl({
 	contactId,
 	contactName,
+	revision,
 	isArchived
 }: {
 	contactId: string
 	contactName: string
+	revision: number
 	isArchived: boolean
 }) {
 	if (isArchived) {
@@ -20,7 +22,7 @@ export function ArchiveControl({
 				description="The contact becomes selectable again on new orders."
 				confirmLabel="Restore contact"
 				successMessage="Restored."
-				onConfirm={() => setContactArchivedAction(contactId, false)}
+				onConfirm={() => setContactArchivedAction(contactId, revision, false)}
 			/>
 		)
 	}
@@ -34,7 +36,7 @@ export function ArchiveControl({
 			confirmLabel="Archive contact"
 			isDestructive
 			successMessage="Archived."
-			onConfirm={() => setContactArchivedAction(contactId, true)}
+			onConfirm={() => setContactArchivedAction(contactId, revision, true)}
 		/>
 	)
 }

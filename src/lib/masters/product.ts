@@ -1,76 +1,95 @@
-import type { FieldErrors } from '@/lib/masters/form-state'
+import { z } from 'zod'
 
-export const PRODUCT_KINDS = ['goods', 'service', 'combo'] as const
-export type ProductKind = (typeof PRODUCT_KINDS)[number]
+export const productKinds = ['GOODS', 'SERVICE', 'COMBO'] as const
+export type ProductKind = (typeof productKinds)[number]
 
 export const PRODUCT_KIND_LABELS: Record<ProductKind, string> = {
-	goods: 'Goods',
-	service: 'Service',
-	combo: 'Combo'
+	GOODS: 'Goods',
+	SERVICE: 'Service',
+	COMBO: 'Combo'
 }
 
-export type Product = {
+export const PRODUCT_KIND_HINTS: Record<ProductKind, string> = {
+	GOODS: 'Stocked item with receipt and delivery movements.',
+	SERVICE: 'Accepted rather than received; never creates stock.',
+	COMBO: 'A separately priced bundled item, stocked as its own product.'
+}
+
+export const productSortColumns = [
+	'name',
+	'kind',
+	'salesPrice',
+	'purchaseCost',
+	'createdAt'
+] as const
+export type ProductSortColumn = (typeof productSortColumns)[number]
+
+export const PRODUCT_SORT_LABELS: Record<ProductSortColumn, string> = {
+	name: 'Name',
+	kind: 'Type',
+	salesPrice: 'Sales price',
+	purchaseCost: 'Purchase cost',
+	createdAt: 'Created'
+}
+
+// Prices stay decimal strings end to end; the bounded scale matches the
+// numeric(20,4) unit-price column.
+const moneySchema = z
+	.string()
+	.trim()
+	.regex(/^\d{1,11}(\.\d{1,4})?$/, 'Enter a non-negative amount with up to four decimals.')
+
+export const productInputSchema = z.object({
+	name: z.string().trim().min(1, 'Enter a product name.').max(160, 'Use 160 characters or fewer.'),
+	kind: z.enum(productKinds, { message: 'Choose a product type.' }),
+	categoryId: z.uuid({ message: 'Choose a category.' }),
+	sku: z
+		.string()
+		.trim()
+		.max(64, 'Use 64 characters or fewer.')
+		.transform((value) => (value.length === 0 ? null : value))
+		.nullable(),
+	salesPrice: moneySchema,
+	purchaseCost: moneySchema
+})
+
+export type ProductInput = z.output<typeof productInputSchema>
+
+export const productListQuerySchema = z.object({
+	search: z.string().trim().max(160).default(''),
+	kind: z.enum([...productKinds, 'ALL']).default('ALL'),
+	categoryId: z.union([z.uuid(), z.literal('ALL')]).catch('ALL'),
+	includeArchived: z.boolean().default(false),
+	sort: z.enum(productSortColumns).default('name'),
+	direction: z.enum(['asc', 'desc']).default('asc'),
+	page: z.coerce.number().int().min(1).catch(1),
+	pageSize: z.number().int().min(1).max(100).default(20)
+})
+
+export type ProductListQuery = z.input<typeof productListQuerySchema>
+
+export type ProductSummary = {
 	id: string
 	name: string
 	kind: ProductKind
-	category: string
+	sku: string | null
+	categoryId: string
+	categoryName: string
 	salesPrice: string
 	purchaseCost: string
 	archivedAt: string | null
+	revision: number
 }
 
-export type ProductInput = Omit<Product, 'id' | 'archivedAt'>
+export const productCategoryInputSchema = z.object({
+	name: z.string().trim().min(1, 'Enter a category name.').max(120, 'Use 120 characters or fewer.')
+})
 
-// Prices stay decimal strings end to end; the bounded scale leaves room for
-// server-side multiplication and aggregation.
-const DECIMAL_PATTERN = /^\d{1,11}(\.\d{1,2})?$/
+export type ProductCategoryInput = z.output<typeof productCategoryInputSchema>
 
-function validateMoney(raw: string, label: string): { value: string; error?: string } {
-	const value = raw.trim()
-	if (value.length === 0) return { value, error: `Enter a ${label}` }
-	if (!DECIMAL_PATTERN.test(value)) {
-		return { value, error: 'Enter a non-negative amount with up to two decimals' }
-	}
-	const [whole, fraction = ''] = value.split('.')
-	return { value: `${whole}.${fraction.padEnd(2, '0')}` }
-}
-
-export function parseProductInput(form: {
+export type ProductCategorySummary = {
+	id: string
 	name: string
-	kind: string
-	category: string
-	salesPrice: string
-	purchaseCost: string
-}): { input: ProductInput; errors: FieldErrors } {
-	const errors: FieldErrors = {}
-	const name = form.name.trim()
-	const category = form.category.trim()
-	const kind = PRODUCT_KINDS.includes(form.kind as ProductKind)
-		? (form.kind as ProductKind)
-		: 'goods'
-
-	if (name.length === 0) errors.name = 'Enter a product name'
-	else if (name.length > 120) errors.name = 'Use 120 characters or fewer'
-
-	if (!PRODUCT_KINDS.includes(form.kind as ProductKind)) errors.kind = 'Choose a product type'
-
-	if (category.length === 0) errors.category = 'Enter a category'
-	else if (category.length > 60) errors.category = 'Use 60 characters or fewer'
-
-	const salesPrice = validateMoney(form.salesPrice, 'sales price')
-	if (salesPrice.error != null) errors.salesPrice = salesPrice.error
-
-	const purchaseCost = validateMoney(form.purchaseCost, 'purchase cost')
-	if (purchaseCost.error != null) errors.purchaseCost = purchaseCost.error
-
-	return {
-		input: {
-			name,
-			kind,
-			category,
-			salesPrice: salesPrice.value,
-			purchaseCost: purchaseCost.value
-		},
-		errors
-	}
+	archivedAt: string | null
+	productCount: number
 }

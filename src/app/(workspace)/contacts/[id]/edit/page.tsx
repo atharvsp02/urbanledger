@@ -2,15 +2,21 @@ import { notFound } from 'next/navigation'
 import type { Metadata } from 'next'
 import { PageHeader } from '@/components/app-shell/page-header'
 import { ContactForm } from '@/app/(workspace)/contacts/contact-form'
-import { FixtureNotice } from '@/app/(workspace)/fixture-notice'
-import { getContact } from '@/server/dev-fixtures/contacts'
+import { getContactDetail } from '@/server/masters/contacts'
+import { ApplicationError } from '@/server/errors/application-error'
 
 export const metadata: Metadata = { title: 'Edit contact' }
 
 export default async function EditContactPage({ params }: { params: Promise<{ id: string }> }) {
 	const { id } = await params
-	const contact = getContact(id)
-	if (contact == null) notFound()
+	let contact
+
+	try {
+		contact = await getContactDetail(id)
+	} catch (error) {
+		if (error instanceof ApplicationError && error.code === 'NOT_FOUND') notFound()
+		throw error
+	}
 
 	return (
 		<>
@@ -23,7 +29,6 @@ export default async function EditContactPage({ params }: { params: Promise<{ id
 					{ label: 'Edit' }
 				]}
 			/>
-			<FixtureNotice master="contacts" />
 			<ContactForm contact={contact} />
 		</>
 	)

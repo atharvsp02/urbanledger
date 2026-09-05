@@ -5,45 +5,47 @@ import Link from 'next/link'
 import { Loader2 } from 'lucide-react'
 import { buttonVariants } from '@/components/ui/button'
 import { Field, FieldGroup, FieldRow } from '@/components/ui/field'
-import { FormErrorSummary, type FieldErrorEntry } from '@/components/ui/form-error-summary'
+import { FormErrorSummary } from '@/components/ui/form-error-summary'
 import { RadioField, TextInput } from '@/components/ui/inputs'
-import { CONTACT_TYPES, CONTACT_TYPE_LABELS, type Contact } from '@/lib/masters/contact'
-import { emptyMasterFormState } from '@/lib/masters/form-state'
+import { fieldErrorEntries, firstFieldError } from '@/components/ui/action-errors'
+import { contactKinds, CONTACT_KIND_LABELS, type ContactDetail } from '@/lib/masters/contact'
 import { saveContactAction } from '@/app/(workspace)/contacts/actions'
 
 const FIELD_LABELS: Record<string, string> = {
 	name: 'Contact name',
-	type: 'Contact type',
+	kind: 'Contact type',
 	email: 'Email',
 	mobile: 'Mobile',
-	addressLine: 'Address',
+	street: 'Address',
 	city: 'City',
 	state: 'State',
 	pincode: 'Pincode'
 }
 
-export function ContactForm({ contact }: { contact?: Contact }) {
-	const [state, formAction, isPending] = useActionState(saveContactAction, emptyMasterFormState)
-
-	const errorEntries: readonly FieldErrorEntry[] = Object.entries(state.errors).flatMap(
-		([field, message]) =>
-			message == null
-				? []
-				: [{ fieldId: `contact-${field}`, label: FIELD_LABELS[field] ?? field, message }]
-	)
+export function ContactForm({ contact }: { contact?: ContactDetail }) {
+	const [state, formAction, isPending] = useActionState(saveContactAction, null)
+	const errorOf = (field: string) => firstFieldError(state, field)
 
 	return (
 		<form action={formAction} className="flex max-w-3xl flex-col gap-6">
-			{contact != null && <input type="hidden" name="contactId" value={contact.id} />}
+			{contact != null && (
+				<>
+					<input type="hidden" name="contactId" value={contact.id} />
+					<input type="hidden" name="revision" value={contact.revision} />
+				</>
+			)}
 
-			<FormErrorSummary errors={errorEntries} description={state.message} />
+			<FormErrorSummary
+				errors={fieldErrorEntries(state, 'contact', FIELD_LABELS)}
+				description={state?.ok === false ? state.error.message : undefined}
+			/>
 
 			<div className="flex flex-col gap-5 rounded-xl border border-border bg-surface p-5">
 				<Field
 					id="contact-name"
 					label={FIELD_LABELS.name}
 					hint="Shown on invoices, bills and payment receipts."
-					error={state.errors.name}
+					error={errorOf('name')}
 					isRequired
 				>
 					{(props) => (
@@ -57,19 +59,19 @@ export function ContactForm({ contact }: { contact?: Contact }) {
 				</Field>
 
 				<FieldGroup
-					id="contact-type"
-					label={FIELD_LABELS.type}
+					id="contact-kind"
+					label={FIELD_LABELS.kind}
 					hint="Customers appear on sales, vendors on purchases."
-					error={state.errors.type}
+					error={errorOf('kind')}
 					isRequired
 				>
-					{CONTACT_TYPES.map((value) => (
+					{contactKinds.map((value) => (
 						<RadioField
 							key={value}
-							name="type"
+							name="kind"
 							value={value}
-							label={CONTACT_TYPE_LABELS[value]}
-							defaultChecked={(contact?.type ?? 'customer') === value}
+							label={CONTACT_KIND_LABELS[value]}
+							defaultChecked={(contact?.kind ?? 'CUSTOMER') === value}
 						/>
 					))}
 				</FieldGroup>
@@ -78,9 +80,8 @@ export function ContactForm({ contact }: { contact?: Contact }) {
 					<Field
 						id="contact-email"
 						label={FIELD_LABELS.email}
-						hint="Required before portal access can be enabled."
-						error={state.errors.email}
-						isRequired
+						hint="Contacts may share an email address."
+						error={errorOf('email')}
 						inRow
 					>
 						{(props) => (
@@ -88,73 +89,42 @@ export function ContactForm({ contact }: { contact?: Contact }) {
 								{...props}
 								type="email"
 								name="email"
-								defaultValue={contact?.email}
+								defaultValue={contact?.email ?? ''}
 								autoComplete="email"
 							/>
 						)}
 					</Field>
-					<Field
-						id="contact-mobile"
-						label={FIELD_LABELS.mobile}
-						error={state.errors.mobile}
-						isRequired
-						inRow
-					>
+					<Field id="contact-mobile" label={FIELD_LABELS.mobile} error={errorOf('mobile')} inRow>
 						{(props) => (
 							<TextInput
 								{...props}
 								inputMode="tel"
 								name="mobile"
-								defaultValue={contact?.mobile}
+								defaultValue={contact?.mobile ?? ''}
 								autoComplete="tel"
 							/>
 						)}
 					</Field>
 				</FieldRow>
 
-				<Field
-					id="contact-addressLine"
-					label={FIELD_LABELS.addressLine}
-					error={state.errors.addressLine}
-					isRequired
-				>
-					{(props) => (
-						<TextInput {...props} name="addressLine" defaultValue={contact?.addressLine} />
-					)}
+				<Field id="contact-street" label={FIELD_LABELS.street} error={errorOf('street')}>
+					{(props) => <TextInput {...props} name="street" defaultValue={contact?.street ?? ''} />}
 				</Field>
 
 				<FieldRow className="sm:grid-cols-3">
-					<Field
-						id="contact-city"
-						label={FIELD_LABELS.city}
-						error={state.errors.city}
-						isRequired
-						inRow
-					>
-						{(props) => <TextInput {...props} name="city" defaultValue={contact?.city} />}
+					<Field id="contact-city" label={FIELD_LABELS.city} error={errorOf('city')} inRow>
+						{(props) => <TextInput {...props} name="city" defaultValue={contact?.city ?? ''} />}
 					</Field>
-					<Field
-						id="contact-state"
-						label={FIELD_LABELS.state}
-						error={state.errors.state}
-						isRequired
-						inRow
-					>
-						{(props) => <TextInput {...props} name="state" defaultValue={contact?.state} />}
+					<Field id="contact-state" label={FIELD_LABELS.state} error={errorOf('state')} inRow>
+						{(props) => <TextInput {...props} name="state" defaultValue={contact?.state ?? ''} />}
 					</Field>
-					<Field
-						id="contact-pincode"
-						label={FIELD_LABELS.pincode}
-						error={state.errors.pincode}
-						isRequired
-						inRow
-					>
+					<Field id="contact-pincode" label={FIELD_LABELS.pincode} error={errorOf('pincode')} inRow>
 						{(props) => (
 							<TextInput
 								{...props}
 								inputMode="numeric"
 								name="pincode"
-								defaultValue={contact?.pincode}
+								defaultValue={contact?.pincode ?? ''}
 							/>
 						)}
 					</Field>

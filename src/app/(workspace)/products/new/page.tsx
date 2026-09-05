@@ -1,11 +1,13 @@
 import type { Metadata } from 'next'
 import { PageHeader } from '@/components/app-shell/page-header'
-import { FixtureNotice } from '@/app/(workspace)/fixture-notice'
+import { listProductCategories } from '@/server/masters/product-categories'
 import { ProductForm } from '@/app/(workspace)/products/product-form'
 
 export const metadata: Metadata = { title: 'New product' }
 
-export default function NewProductPage() {
+export default async function NewProductPage() {
+	const categories = await listProductCategories()
+
 	return (
 		<>
 			<PageHeader
@@ -13,8 +15,7 @@ export default function NewProductPage() {
 				lead="Create a goods, service or combo product."
 				breadcrumbs={[{ label: 'Products', href: '/products' }, { label: 'New product' }]}
 			/>
-			<FixtureNotice master="products" />
-			<ProductForm />
+			<ProductForm categories={categories} />
 		</>
 	)
 }

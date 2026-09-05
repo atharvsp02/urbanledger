@@ -1,6 +1,6 @@
 import { Suspense } from 'react'
 import Link from 'next/link'
-import { Package, Plus } from 'lucide-react'
+import { Package, Plus, Tags } from 'lucide-react'
 import { PageHeader } from '@/components/app-shell/page-header'
 import { Badge } from '@/components/ui/badge'
 import { buttonVariants } from '@/components/ui/button'
@@ -10,46 +10,54 @@ import { Pagination } from '@/components/ui/pagination'
 import { ProductThumbnail } from '@/components/ui/placeholder'
 import { SkeletonTable } from '@/components/ui/skeleton'
 import { EmptyState } from '@/components/ui/state-panel'
-import { FixtureNotice } from '@/app/(workspace)/fixture-notice'
 import { formatAmount } from '@/lib/format'
 import {
-	PRODUCT_KINDS,
+	productKinds,
+	productSortColumns,
 	PRODUCT_KIND_LABELS,
-	type Product,
-	type ProductKind
+	PRODUCT_SORT_LABELS,
+	type ProductSummary
 } from '@/lib/masters/product'
-import { listProducts } from '@/server/dev-fixtures/products'
+import { listProductCategories } from '@/server/masters/product-categories'
+import { listProducts } from '@/server/masters/products'
 
-const PAGE_SIZE = 10
+const PAGE_SIZE = 20
 
-type ProductParams = { q?: string; kind?: string; archived?: string; page?: string }
+type ProductParams = {
+	q?: string
+	kind?: string
+	category?: string
+	archived?: string
+	sort?: string
+	dir?: string
+	page?: string
+}
+
+function buildHref(params: ProductParams, patch: ProductParams) {
+	const merged = { ...params, ...patch }
+	const query = new URLSearchParams()
+
+	for (const [key, value] of Object.entries(merged)) {
+		if (value != null && value !== '') query.set(key, value)
+	}
+
+	const queryString = query.toString()
+	return queryString === '' ? '/products' : `/products?${queryString}`
+}
 
 async function ProductsTable({ params }: { params: ProductParams }) {
-	const kind: ProductKind | 'all' = PRODUCT_KINDS.includes(params.kind as ProductKind)
-		? (params.kind as ProductKind)
-		: 'all'
-	const includeArchived = params.archived === 'include'
-	const search = params.q ?? ''
-
-	const result = listProducts({
-		search,
-		kind,
-		includeArchived,
+	const result = await listProducts({
+		search: params.q ?? '',
+		kind: (params.kind as 'ALL') ?? 'ALL',
+		categoryId: params.category ?? 'ALL',
+		includeArchived: params.archived === 'include',
+		sort: params.sort as 'name',
+		direction: params.dir === 'desc' ? 'desc' : 'asc',
 		page: Number(params.page ?? '1') || 1,
 		pageSize: PAGE_SIZE
 	})
 
-	const buildHref = (patch: ProductParams) => {
-		const merged = { ...params, ...patch }
-		const query = new URLSearchParams()
-		for (const [key, value] of Object.entries(merged)) {
-			if (value != null && value !== '') query.set(key, value)
-		}
-		const queryString = query.toString()
-		return queryString === '' ? '/products' : `/products?${queryString}`
-	}
-
-	const columns: readonly TableColumn<Product>[] = [
+	const columns: readonly TableColumn<ProductSummary>[] = [
 		{
 			id: 'name',
 			header: 'Product',
@@ -58,11 +66,14 @@ async function ProductsTable({ params }: { params: ProductParams }) {
 					<ProductThumbnail kind={product.kind} className="size-8" />
 					<span className="min-w-0">
 						<span className="block font-medium">{product.name}</span>
-						<span className="block text-xs text-muted-foreground">{product.category}</span>
+						<span className="block text-xs text-muted-foreground">
+							{product.sku ?? product.categoryName}
+						</span>
 					</span>
 				</span>
 			)
 		},
+		{ id: 'category', header: 'Category', cell: (product) => product.categoryName },
 		{
 			id: 'kind',
 			header: 'Type',
@@ -104,9 +115,11 @@ async function ProductsTable({ params }: { params: ProductParams }) {
 					<div className="p-5">
 						<EmptyState
 							icon={Package}
-							title={search === '' ? 'No products yet' : 'No products match these filters'}
+							title={
+								(params.q ?? '') === '' ? 'No products yet' : 'No products match these filters'
+							}
 							description={
-								search === ''
+								(params.q ?? '') === ''
 									? 'Add the goods, services and combos this business sells or buys.'
 									: 'Clear the search or choose a different type.'
 							}
@@ -121,10 +134,10 @@ async function ProductsTable({ params }: { params: ProductParams }) {
 			{result.rows.length > 0 && (
 				<Pagination
 					page={result.page}
-					pageSize={PAGE_SIZE}
+					pageSize={result.pageSize}
 					totalCount={result.totalCount}
 					itemNoun="products"
-					buildHref={(page) => buildHref({ page: String(page) })}
+					buildHref={(page) => buildHref(params, { page: String(page) })}
 				/>
 			)}
 		</div>
@@ -137,11 +150,7 @@ export default async function ProductsPage({
 	searchParams: Promise<ProductParams>
 }) {
 	const params = await searchParams
-	const kind: ProductKind | 'all' = PRODUCT_KINDS.includes(params.kind as ProductKind)
-		? (params.kind as ProductKind)
-		: 'all'
-	const includeArchived = params.archived === 'include'
-	const search = params.q ?? ''
+	const categories = await listProductCategories()
 
 	return (
 		<>
@@ -149,45 +158,79 @@ export default async function ProductsPage({
 				title="Products"
 				lead="Goods, services and combos available on sales and purchase documents."
 				action={
-					<Link href="/products/new" className={buttonVariants({ size: 'sm' })}>
-						<Plus aria-hidden="true" className="size-4" />
-						New product
-					</Link>
+					<>
+						<Link
+							href="/products/categories"
+							className={buttonVariants({ variant: 'secondary', size: 'sm' })}
+						>
+							<Tags aria-hidden="true" className="size-4" />
+							Categories
+						</Link>
+						<Link href="/products/new" className={buttonVariants({ size: 'sm' })}>
+							<Plus aria-hidden="true" className="size-4" />
+							New product
+						</Link>
+					</>
 				}
 			/>
-
-			<FixtureNotice master="products" />
 
 			<ListToolbar
 				action="/products"
 				searchLabel="Search products"
-				searchPlaceholder="Name or category"
-				searchDefaultValue={search}
+				searchPlaceholder="Name, SKU or category"
+				searchDefaultValue={params.q ?? ''}
 				resetHref="/products"
 			>
 				<ToolbarFilter
 					label="Type"
 					name="kind"
-					defaultValue={kind}
+					defaultValue={params.kind ?? 'ALL'}
 					options={[
-						{ value: 'all', label: 'All types' },
-						...PRODUCT_KINDS.map((value) => ({ value, label: PRODUCT_KIND_LABELS[value] }))
+						{ value: 'ALL', label: 'All types' },
+						...productKinds.map((value) => ({ value, label: PRODUCT_KIND_LABELS[value] }))
+					]}
+				/>
+				<ToolbarFilter
+					label="Category"
+					name="category"
+					defaultValue={params.category ?? 'ALL'}
+					options={[
+						{ value: 'ALL', label: 'All categories' },
+						...categories.map((category) => ({ value: category.id, label: category.name }))
 					]}
 				/>
 				<ToolbarFilter
 					label="Archived"
 					name="archived"
-					defaultValue={includeArchived ? 'include' : 'exclude'}
+					defaultValue={params.archived === 'include' ? 'include' : 'exclude'}
 					options={[
 						{ value: 'exclude', label: 'Active only' },
 						{ value: 'include', label: 'Include archived' }
 					]}
 				/>
+				<ToolbarFilter
+					label="Sort by"
+					name="sort"
+					defaultValue={params.sort ?? 'name'}
+					options={productSortColumns.map((value) => ({
+						value,
+						label: PRODUCT_SORT_LABELS[value]
+					}))}
+				/>
+				<ToolbarFilter
+					label="Order"
+					name="dir"
+					defaultValue={params.dir === 'desc' ? 'desc' : 'asc'}
+					options={[
+						{ value: 'asc', label: 'Ascending' },
+						{ value: 'desc', label: 'Descending' }
+					]}
+				/>
 			</ListToolbar>
 
 			<Suspense
-				key={`${search}|${kind}|${includeArchived}|${params.page ?? '1'}`}
-				fallback={<SkeletonTable rows={6} columns={5} />}
+				key={`${params.q}|${params.kind}|${params.category}|${params.archived}|${params.sort}|${params.dir}|${params.page}`}
+				fallback={<SkeletonTable rows={6} columns={6} />}
 			>
 				<ProductsTable params={params} />
 			</Suspense>

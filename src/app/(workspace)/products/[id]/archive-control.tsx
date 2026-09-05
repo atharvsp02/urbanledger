@@ -6,10 +6,12 @@ import { setProductArchivedAction } from '@/app/(workspace)/products/actions'
 export function ArchiveControl({
 	productId,
 	productName,
+	revision,
 	isArchived
 }: {
 	productId: string
 	productName: string
+	revision: number
 	isArchived: boolean
 }) {
 	if (isArchived) {
@@ -20,7 +22,7 @@ export function ArchiveControl({
 				description="The product becomes selectable again on new documents."
 				confirmLabel="Restore product"
 				successMessage="Restored."
-				onConfirm={() => setProductArchivedAction(productId, false)}
+				onConfirm={() => setProductArchivedAction(productId, revision, false)}
 			/>
 		)
 	}
@@ -34,7 +36,7 @@ export function ArchiveControl({
 			confirmLabel="Archive product"
 			isDestructive
 			successMessage="Archived."
-			onConfirm={() => setProductArchivedAction(productId, true)}
+			onConfirm={() => setProductArchivedAction(productId, revision, true)}
 		/>
 	)
 }

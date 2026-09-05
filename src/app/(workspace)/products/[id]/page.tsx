@@ -6,14 +6,25 @@ import { buttonVariants } from '@/components/ui/button'
 import { ProductThumbnail } from '@/components/ui/placeholder'
 import { formatAmount, formatBusinessDate } from '@/lib/format'
 import { PRODUCT_KIND_LABELS } from '@/lib/masters/product'
-import { getProduct } from '@/server/dev-fixtures/products'
+import { getActor } from '@/server/auth/actor'
+import { getProduct } from '@/server/masters/products'
+import { ApplicationError } from '@/server/errors/application-error'
 import { ArchiveControl } from '@/app/(workspace)/products/[id]/archive-control'
-import { FixtureNotice } from '@/app/(workspace)/fixture-notice'
 
 export default async function ProductDetailPage({ params }: { params: Promise<{ id: string }> }) {
 	const { id } = await params
-	const product = getProduct(id)
-	if (product == null) notFound()
+	const actor = await getActor()
+	let product
+
+	try {
+		product = await getProduct(id)
+	} catch (error) {
+		if (error instanceof ApplicationError && error.code === 'NOT_FOUND') notFound()
+		throw error
+	}
+
+	const canUpdate = actor.capabilities.includes('masters:update')
+	const canArchive = actor.capabilities.includes('masters:archive')
 
 	return (
 		<>
@@ -22,27 +33,31 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
 				breadcrumbs={[{ label: 'Products', href: '/products' }, { label: product.name }]}
 				action={
 					<>
-						<Link
-							href={`/products/${product.id}/edit`}
-							className={buttonVariants({ variant: 'secondary', size: 'sm' })}
-						>
-							Edit
-						</Link>
-						<ArchiveControl
-							productId={product.id}
-							productName={product.name}
-							isArchived={product.archivedAt != null}
-						/>
+						{canUpdate && (
+							<Link
+								href={`/products/${product.id}/edit`}
+								className={buttonVariants({ variant: 'secondary', size: 'sm' })}
+							>
+								Edit
+							</Link>
+						)}
+						{canArchive && (
+							<ArchiveControl
+								productId={product.id}
+								productName={product.name}
+								revision={product.revision}
+								isArchived={product.archivedAt != null}
+							/>
+						)}
 					</>
 				}
 			/>
 
-			<FixtureNotice master="products" />
-
 			<div className="flex flex-wrap items-center gap-3">
 				<ProductThumbnail kind={product.kind} />
 				<Badge>{PRODUCT_KIND_LABELS[product.kind]}</Badge>
-				<Badge tone="accent">{product.category}</Badge>
+				<Badge tone="accent">{product.categoryName}</Badge>
+				{product.sku != null && <Badge>{product.sku}</Badge>}
 				{product.archivedAt == null ? (
 					<Badge tone="success">Active</Badge>
 				) : (

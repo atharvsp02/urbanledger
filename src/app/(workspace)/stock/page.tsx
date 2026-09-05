@@ -2,6 +2,7 @@ import { Suspense } from 'react'
 import Link from 'next/link'
 import { Boxes } from 'lucide-react'
 import { PageHeader } from '@/components/app-shell/page-header'
+import { buttonVariants } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { DataTable, type TableColumn } from '@/components/ui/data-table'
 import { Pagination } from '@/components/ui/pagination'
@@ -88,7 +89,15 @@ export default async function StockPage({ searchParams }: { searchParams: Promis
 		<>
 			<PageHeader
 				title="Stock"
-				lead="Quantity on hand from recorded receipts. Quantity is not an inventory valuation."
+				lead="Quantity on hand from recorded receipts and deliveries. Quantity is not an inventory valuation."
+				action={
+					<Link
+						href="/stock/movements"
+						className={buttonVariants({ variant: 'secondary', size: 'sm' })}
+					>
+						Movement history
+					</Link>
+				}
 			/>
 
 			<Suspense key={params.page} fallback={<SkeletonTable rows={6} columns={3} />}>

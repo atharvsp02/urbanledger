@@ -1,21 +1,19 @@
 # UrbanLedger
 
-An accounting application connecting contacts, products, purchases, sales, bills, invoices,
-payments, journals, budgets and financial reports.
-
-This repository is the application root. Build and run the project directly here; do not create
-a second project root inside it or turn an inspiration project into the application.
+UrbanLedger is a local-first accounting application connecting contacts, products, purchases,
+sales, bills, invoices, payments, journals, budgets and financial reports.
 
 ## Current status
 
-The Next.js application setup and pinned local Supabase services are implemented. PostgreSQL,
-Auth, private Storage and captured email run locally through Docker. Authentication workflows,
-database integration and accounting features are not implemented yet.
+The backend foundation is implemented. It includes pinned local Supabase services, Prisma
+migrations, validated environment boundaries, idempotent showcase data, password authentication,
+server-enforced Admin, Accountant and Contact access, and explicit Contact portal ownership.
+Accounting transaction commands and reports are the next implementation slice.
 
 ## Development
 
-Use Node.js 22.13 or newer within the 22.x release line and pnpm 11.24.0.
-The package manager and dependency versions are pinned in the repository.
+Use Node.js 22.13 or newer within the 22.x release line and pnpm 11.24.0. Docker must be installed
+and running.
 
 ```bash
 pnpm install --frozen-lockfile
@@ -23,108 +21,75 @@ pnpm local:start
 pnpm dev
 ```
 
-Open http://127.0.0.1:3000. Captured Auth email is available at
-http://127.0.0.1:54324. Use `pnpm local:status` to inspect services and `pnpm local:stop` to stop
-them without deleting data. Run `pnpm check` for lint, type and formatting checks, then
-`pnpm build` separately for a production build. `pnpm start` serves that build. Do not run
-development and production builds against the same build directory simultaneously.
+`pnpm local:start` creates the private `.env.local`, applies migrations and safely reapplies the
+seed. The seed Login IDs are `uladmin`, `ulacct`, `ulcust` and `ulvend`. Their private passwords
+are stored only in the matching `URBANLEDGER_SEED_*_PASSWORD` entries in `.env.local`.
+
+Open http://127.0.0.1:3000. Captured Auth email is available at http://127.0.0.1:54324. Use
+`pnpm local:status` to inspect safe service endpoints and `pnpm local:stop` to stop services
+without deleting data. Reset local data only with:
+
+```bash
+pnpm local:reset -- --confirm urbanledger
+```
+
+Run `pnpm check` and `pnpm build` before committing. Install the pinned browser once with
+`pnpm exec playwright install chromium`, then run the authentication suite with
+`pnpm test:e2e`. `pnpm start` serves a production build. Do not run development and production
+builds against the same build directory simultaneously.
 
 The starter's ESLint 9 emits an upstream deprecation warning. Some bundled lint plugins do not
-declare ESLint 10 support yet; review the compatible linting stack before production release.
+declare ESLint 10 support yet, so the linting stack remains pinned.
 
 ## Local-first architecture
 
-Development and the hackathon presentation will run entirely locally. No Vercel deployment,
-Supabase cloud project or external email service is required or configured.
+Development, acceptance and presentation run locally. No Vercel deployment, Supabase cloud
+project or external email service is required or configured.
 
-- Next.js, React and TypeScript for the application, including server-side handlers.
-- Tailwind with shared UI components and semantic design tokens.
-- Pinned local Supabase CLI/Docker services for PostgreSQL, password authentication, private
-  Storage and captured email.
-- Prisma for server-side business data access, with persistent local database/image volumes.
-- Login ID/password, Accountant signup, authorized user creation and local password recovery.
-- A captured local email inbox for confirmation and reset links; no real outbound email.
-- Local Next.js for frontend and backend, including a local production-build presentation.
+- Next.js, React and TypeScript provide the application and server-side boundaries.
+- Local Supabase CLI and Docker provide PostgreSQL, password Auth, private Storage and captured
+  email.
+- Prisma is the only business-data path and runs on the server with a restricted database role.
+- Login uses Login ID and password. Public signup creates Accountant access only.
+- Supabase verifies identity. Current database grants and explicit Contact links determine access.
+- Browser Supabase access is limited to Auth. Privileged keys remain server-only.
+- Initial package, browser and container downloads must be prepared before offline verification.
 
-Prisma, account workflows and data preparation are not implemented yet. Initial package and
-container downloads must be prepared before verifying the complete application without external
-network access.
-
-A later hosted deployment will use the same business code with reviewed environment settings,
-new secrets, callbacks, email configuration and either fresh data or a controlled migration of
-database records, Auth identities and image objects. Browser-public endpoint changes require a
-rebuild. This is a portability requirement, not an automatic deployment or data-sync switch;
-hosting requires a separate instruction.
+A future hosted deployment can supply reviewed environment values to the same business code. It
+still requires separate approval, fresh secrets and a controlled data, Auth and object migration.
+No automatic local-to-hosted synchronization is promised.
 
 ## Repository layout
 
-Current:
-
 ```text
 .
-  README.md       project entry point
-  .gitignore      local-reference, secret and generated-file exclusions
-  package.json    dependencies and development/check/build commands
-  pnpm-lock.yaml  reproducible dependency resolution
-  src/app/        starter page, layout, styles, icon, 404 and health route
-  docs/          local specifications and implementation plans, Git-ignored
-  inspiration/   local reference projects, Git-ignored
+  prisma/         schema, migrations and idempotent seed
+  scripts/        guarded local setup and reset commands
+  src/app/        routes, server actions and HTTP boundaries
+  src/lib/        shared validation and typed contracts
+  src/server/     database, authentication and authorization boundaries
+  supabase/       local service configuration
+  tests/e2e/      critical browser workflows
 ```
 
-Application directories to introduce when their implementations exist:
+`docs/` and `inspiration/` are local, Git-ignored references. Never import from or modify the
+reference repositories as application runtime code.
 
-```text
-src/components/   shared UI and accounting screens
-src/lib/          contracts and shared helpers
-src/server/       authorization, business commands and report queries
-prisma/           schema and reviewed migrations
-supabase/         local service configuration
-public/           approved public assets
-scripts/          setup and verification commands
-```
+## Product and security boundaries
 
-Package/tooling configuration belongs at this repository root. Add tests and CI with their
-actual consumers, not placeholder workflows that assume secrets or infrastructure exist.
+The baseline roles are Admin, Accountant and Contact. Contact is the restricted customer/vendor
+portal role. Roles, totals, account identifiers and ownership claims from clients are untrusted.
 
-## Product boundaries
+All financial documents will use one transactional posting engine with exact decimal arithmetic.
+Reports will derive from persisted posted journal items. Posted history will be corrected through
+linked reversals, never silent edits or deletion.
 
-The baseline roles are Admin, Invoicing User / Accountant, and User / Contact. User is the
-restricted customer/vendor role, not Accountant. Signup creates Accountant only; Admin controls
-privileged user creation. Accountant can manage customer/vendor details. The System actor means
-automation, not another login role. Enforce permissions and Contact ownership on the server.
-
-Required business workflows come before optional enhancements. All financial documents share
-one transactional posting engine; reports derive from persisted posted journal items. A
-simulated portal payment must be clearly labeled and still produce correct internal accounting
-records when successful.
-
-Contact profile-image capability is required. Furniture product photography is optional; the
-complete accounting workflow must work with accessible placeholders.
-
-Prepare private local access for Admin, Accountant, Customer and Vendor with realistic synthetic
-records. The product dashboard must have no Demo/Sandbox banner, mode badge or credential panel.
-The payment flow accepts an amount and shows success only after commit, with a numbered receipt,
-updated existing invoice and local invoice/receipt PDF downloads. Payment simulation is disclosed
-in the relevant payment flow and receipt, not as a global dashboard label. These remain planned.
-
-## Local references and documentation
-
-The current ignore policy intentionally excludes `docs/` and `inspiration/` from Git. They are
-not part of a fresh clone, a build dependency, or runtime configuration. Local planning lives
-under `docs/specs/` and `docs/plans/`; do not force-add it without an explicit change to that
-policy.
-
-Reuse selected reference code through reviewed adaptations. Do not import modules directly
-from `inspiration/`, modify its repositories as part of application work, or copy old branding,
-environment files, identities, credentials or unrelated business rules.
+The payment flow will accept an amount and show success only after the database transaction
+commits. It will update the existing invoice, allocate the payment, post ledger effects and create
+a numbered receipt without creating another invoice. Simulation disclosure belongs only in the
+payment flow, payment history and receipt.
 
 ## Contributing
 
-Keep code comments to the absolute minimum. Prefer clear names and structure; comment only
-when a necessary reason, invariant or gotcha cannot be expressed in code. Avoid narration,
-redundant docstrings and decorative comment headers. Preserve required license notices and
-tooling directives.
-
-Keep changes scoped, verify them using the configured tooling,
-and commit completed work in logical parts with one-line Conventional Commit messages.
-Do not include AI attribution or private session artifacts in Git history.
+Keep changes scoped and comments minimal. Stage explicit paths, run configured checks, review the
+staged diff and use a one-line Conventional Commit without AI attribution.

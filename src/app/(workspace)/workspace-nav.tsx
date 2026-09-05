@@ -1,5 +1,6 @@
 import {
 	BookOpen,
+	History,
 	LayoutDashboard,
 	NotebookPen,
 	Package,
@@ -7,9 +8,11 @@ import {
 	Percent,
 	ReceiptText,
 	Scale,
+	ShoppingBag,
 	ShoppingCart,
 	Tags,
 	Users,
+	Truck,
 	Warehouse
 } from 'lucide-react'
 import type { Actor, Capability } from '@/lib/contracts/access'
@@ -135,6 +138,26 @@ const NAV_DEFINITION: readonly NavDefinition[] = [
 		]
 	},
 	{
+		id: 'sales',
+		label: 'Sales',
+		items: [
+			{
+				id: 'sales-orders',
+				label: 'Sales orders',
+				icon: <ShoppingBag className="size-4" />,
+				href: '/sales/orders',
+				capability: 'transactions:read'
+			},
+			{
+				id: 'sales-deliveries',
+				label: 'Deliveries',
+				icon: <Truck className="size-4" />,
+				href: '/sales/deliveries',
+				capability: 'transactions:read'
+			}
+		]
+	},
+	{
 		id: 'inventory',
 		label: 'Inventory',
 		items: [
@@ -143,6 +166,13 @@ const NAV_DEFINITION: readonly NavDefinition[] = [
 				label: 'Stock',
 				icon: <Warehouse className="size-4" />,
 				href: '/stock',
+				capability: 'transactions:read'
+			},
+			{
+				id: 'stock-movements',
+				label: 'Stock movements',
+				icon: <History className="size-4" />,
+				href: '/stock/movements',
 				capability: 'transactions:read'
 			}
 		]

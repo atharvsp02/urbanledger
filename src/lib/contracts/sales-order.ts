@@ -73,6 +73,19 @@ export const salesOrderDetailSchema = z.object({
 	createdBy: z.object({ id: z.uuid(), displayName: z.string() }),
 	createdAt: z.iso.datetime(),
 	updatedAt: z.iso.datetime(),
+	// Defaults keep results stored by earlier operations parseable on replay.
+	delivery: z
+		.object({ id: z.uuid(), deliveryNumber: z.string(), deliveryDate: z.iso.date() })
+		.nullable()
+		.default(null),
+	customerInvoice: z
+		.object({
+			id: z.uuid(),
+			invoiceNumber: z.string(),
+			state: z.enum(['DRAFT', 'POSTED', 'CANCELLED'])
+		})
+		.nullable()
+		.default(null),
 	lines: z.array(salesOrderLineSchema)
 })
 
@@ -82,7 +95,7 @@ export type SalesOrderTransitionInput = z.input<typeof salesOrderTransitionInput
 export type GetSalesOrderInput = z.input<typeof getSalesOrderInputSchema>
 export type SalesOrderListInput = z.input<typeof salesOrderListInputSchema>
 export type SalesOrderDetail = z.output<typeof salesOrderDetailSchema>
-export type SalesOrderSummary = Omit<SalesOrderDetail, 'lines'>
+export type SalesOrderSummary = Omit<SalesOrderDetail, 'lines' | 'delivery' | 'customerInvoice'>
 
 export type SalesOrderListResult = {
 	rows: SalesOrderSummary[]

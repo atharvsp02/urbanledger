@@ -83,6 +83,7 @@ async function documentSummary(
 		externalReference: string | null
 		contactId: string
 		contactNameSnapshot: string
+		revision: number
 		netTotal: Prisma.Decimal
 		taxTotal: Prisma.Decimal
 		total: Prisma.Decimal
@@ -104,6 +105,7 @@ async function documentSummary(
 		dueDate: dateOnly(document.dueDate),
 		reference: document.externalReference,
 		contact: { id: document.contactId, name: document.contactNameSnapshot },
+		revision: document.revision,
 		netTotal: formatJournalAmount(document.netTotal),
 		taxTotal: formatJournalAmount(document.taxTotal),
 		total: formatJournalAmount(document.total),

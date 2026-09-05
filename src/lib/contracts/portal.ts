@@ -33,6 +33,7 @@ export type PortalDocumentSummary = {
 	dueDate: string
 	reference: string | null
 	contact: { id: string; name: string }
+	revision: number
 	netTotal: string
 	taxTotal: string
 	total: string

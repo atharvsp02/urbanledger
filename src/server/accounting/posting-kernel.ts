@@ -36,6 +36,13 @@ export async function allocateJournalEntryNumber(
 	postingDate: string
 ) {
 	const period = postingDate.slice(0, 4)
+	const business = await transaction.business.findUnique({
+		where: { id: businessId },
+		select: { journalEntryPrefix: true }
+	})
+	if (!business)
+		throw new ApplicationError('INVALID_STATE', 'Business configuration is unavailable.')
+	const prefix = `${business.journalEntryPrefix}/${period}`
 	const sequence = await transaction.documentSequence.upsert({
 		where: {
 			businessId_kind_period: { businessId, kind: 'JOURNAL_ENTRY', period }
@@ -44,10 +51,10 @@ export async function allocateJournalEntryNumber(
 			businessId,
 			kind: 'JOURNAL_ENTRY',
 			period,
-			prefix: `JE/${period}`,
+			prefix,
 			nextNumber: BigInt('2')
 		},
-		update: { nextNumber: { increment: 1 } }
+		update: { prefix, nextNumber: { increment: 1 } }
 	})
 
 	const number = sequence.nextNumber - BigInt('1')

@@ -160,40 +160,56 @@ enum SequenceKind {
 }
 
 model Business {
-  id                   String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  slug                 String                  @unique @db.VarChar(64)
-  name                 String                  @db.VarChar(160)
-  currency             String                  @default("INR") @db.Char(3)
-  timezone             String                  @default("Asia/Kolkata") @db.VarChar(64)
-  fiscalYearStartMonth Int                     @default(4)
-  fiscalYearStartDay   Int                     @default(1)
-  accountingLockDate   DateTime?               @db.Date
-  readyAt              DateTime?               @db.Timestamptz(6)
-  createdAt            DateTime                @default(now()) @db.Timestamptz(6)
-  updatedAt            DateTime                @updatedAt @db.Timestamptz(6)
-  staffGrants          StaffGrant[]
-  portalAccess         PortalAccess[]
-  provisioning         ProvisioningOperation[]
-  contacts             Contact[]
-  productCategories    ProductCategory[]
-  products             Product[]
-  orders               Order[]
-  purchaseReceipts     PurchaseReceipt[]
-  salesDeliveries      SalesDelivery[]
-  inventoryMovements   InventoryMovement[]
-  financialDocuments   FinancialDocument[]
-  paymentAttempts      PaymentAttempt[]
-  payments             Payment[]
-  ledgerAccounts       LedgerAccount[]
-  journals             Journal[]
-  taxes                Tax[]
-  analyticAccounts     AnalyticAccount[]
-  budgets              Budget[]
-  fileAssets           FileAsset[]
-  entries              JournalEntry[]
-  sequences            DocumentSequence[]
-  operations           CommandOperation[]
-  auditEvents          AuditEvent[]
+  id                    String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  slug                  String                  @unique @db.VarChar(64)
+  name                  String                  @db.VarChar(160)
+  addressLine1          String?                 @db.VarChar(240)
+  addressLine2          String?                 @db.VarChar(240)
+  city                  String?                 @db.VarChar(100)
+  state                 String?                 @db.VarChar(100)
+  postalCode            String?                 @db.VarChar(16)
+  country               String                  @default("India") @db.VarChar(100)
+  currency              String                  @default("INR") @db.Char(3)
+  timezone              String                  @default("Asia/Kolkata") @db.VarChar(64)
+  fiscalYearStartMonth  Int                     @default(4)
+  fiscalYearStartDay    Int                     @default(1)
+  accountingLockDate    DateTime?               @db.Date
+  purchaseOrderPrefix   String                  @default("PO") @db.VarChar(12)
+  salesOrderPrefix      String                  @default("SO") @db.VarChar(12)
+  purchaseReceiptPrefix String                  @default("PR") @db.VarChar(12)
+  salesDeliveryPrefix   String                  @default("DEL") @db.VarChar(12)
+  customerInvoicePrefix String                  @default("INV") @db.VarChar(12)
+  vendorBillPrefix      String                  @default("BILL") @db.VarChar(12)
+  customerPaymentPrefix String                  @default("RCPT") @db.VarChar(12)
+  vendorPaymentPrefix   String                  @default("PAY") @db.VarChar(12)
+  journalEntryPrefix    String                  @default("JE") @db.VarChar(12)
+  revision              Int                     @default(1)
+  readyAt               DateTime?               @db.Timestamptz(6)
+  createdAt             DateTime                @default(now()) @db.Timestamptz(6)
+  updatedAt             DateTime                @updatedAt @db.Timestamptz(6)
+  staffGrants           StaffGrant[]
+  portalAccess          PortalAccess[]
+  provisioning          ProvisioningOperation[]
+  contacts              Contact[]
+  productCategories     ProductCategory[]
+  products              Product[]
+  orders                Order[]
+  purchaseReceipts      PurchaseReceipt[]
+  salesDeliveries       SalesDelivery[]
+  inventoryMovements    InventoryMovement[]
+  financialDocuments    FinancialDocument[]
+  paymentAttempts       PaymentAttempt[]
+  payments              Payment[]
+  ledgerAccounts        LedgerAccount[]
+  journals              Journal[]
+  taxes                 Tax[]
+  analyticAccounts      AnalyticAccount[]
+  budgets               Budget[]
+  fileAssets            FileAsset[]
+  entries               JournalEntry[]
+  sequences             DocumentSequence[]
+  operations            CommandOperation[]
+  auditEvents           AuditEvent[]
 
   @@map("businesses")
 }

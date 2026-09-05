@@ -7,6 +7,10 @@ import { ErrorState } from '@/components/ui/state-panel'
 import type { VendorBillDetail } from '@/lib/contracts/vendor-bill'
 import { formatAmount, formatBusinessDate, formatQuantity, trimMoneyScale } from '@/lib/format'
 import { getActor } from '@/server/auth/actor'
+import { getBusinessToday } from '@/server/business/today'
+import { getDocumentPaymentHistory, getPaymentOptions } from '@/server/payments'
+import { SettlementPanel } from '@/app/(workspace)/payments/settlement-panel'
+import { DocumentReversalControl } from '@/app/(workspace)/payments/document-reversal-control'
 import { getVendorBill, getVendorBillOptions } from '@/server/purchasing'
 import { BillStateBadge } from '@/app/(workspace)/purchases/bills/bill-state-badge'
 import { DraftBillControls } from '@/app/(workspace)/purchases/bills/[id]/bill-controls'
@@ -31,6 +35,13 @@ export default async function VendorBillDetailPage({
 	const isDraft = bill.state === 'DRAFT'
 	const canTransact = actor.capabilities.includes('transactions:create')
 	const options = isDraft && canTransact ? await getVendorBillOptions(actor) : null
+	const isPosted = bill.state === 'POSTED'
+	const canPay = actor.capabilities.includes('payments:record')
+	const canReverse = actor.capabilities.includes('transactions:reverse')
+	const history = isPosted ? await getDocumentPaymentHistory(actor, { documentId: bill.id }) : null
+	const paymentOptions =
+		isPosted && canPay ? await getPaymentOptions(actor, { documentId: bill.id }) : null
+	const today = isPosted ? await getBusinessToday(actor) : bill.billDate
 
 	const columns: readonly TableColumn<BillLine>[] = [
 		{ id: 'product', header: 'Product', cell: (line) => line.productName },
@@ -137,7 +148,7 @@ export default async function VendorBillDetailPage({
 						>
 							{bill.journalEntry.reference}
 						</Link>
-						. This bill is ready for payment once payment recording is available.
+						.
 					</span>
 				)}
 				{bill.state === 'CANCELLED' && (
@@ -159,6 +170,18 @@ export default async function VendorBillDetailPage({
 						purchaseJournals={options.data.purchaseJournals}
 					/>
 				</WorkSurface>
+			)}
+
+			{isPosted && history?.ok === true && (
+				<SettlementPanel
+					history={history.data}
+					options={paymentOptions?.ok === true ? paymentOptions.data : null}
+					direction="VENDOR_OUTGOING"
+					documentRevision={bill.revision}
+					documentPath={`/purchases/bills/${bill.id}`}
+					today={today}
+					canRecordPayment={canPay}
+				/>
 			)}
 
 			<div className="grid gap-4 lg:grid-cols-[1.6fr_1fr]">
@@ -192,6 +215,21 @@ export default async function VendorBillDetailPage({
 					</dl>
 				</WorkSurface>
 			</div>
+
+			{isPosted && canReverse && (
+				<WorkSurface
+					title="Reverse this bill"
+					description="Reverse live payments first. Reversal appends an opposite entry at an allowed date."
+				>
+					<DocumentReversalControl
+						documentId={bill.id}
+						documentKind="VENDOR_BILL"
+						documentPath={`/purchases/bills/${bill.id}`}
+						revision={bill.revision}
+						today={today}
+					/>
+				</WorkSurface>
+			)}
 
 			<div className="rounded-xl border border-border bg-surface">
 				<DataTable

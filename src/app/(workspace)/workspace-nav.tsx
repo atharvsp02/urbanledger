@@ -14,6 +14,7 @@ import {
 	Tags,
 	Users,
 	Truck,
+	Wallet,
 	Warehouse
 } from 'lucide-react'
 import type { Actor, Capability } from '@/lib/contracts/access'
@@ -161,6 +162,19 @@ const NAV_DEFINITION: readonly NavDefinition[] = [
 				label: 'Customer invoices',
 				icon: <FileText className="size-4" />,
 				href: '/sales/invoices',
+				capability: 'transactions:read'
+			}
+		]
+	},
+	{
+		id: 'payments',
+		label: 'Payments',
+		items: [
+			{
+				id: 'payments-list',
+				label: 'Payments',
+				icon: <Wallet className="size-4" />,
+				href: '/payments',
 				capability: 'transactions:read'
 			}
 		]

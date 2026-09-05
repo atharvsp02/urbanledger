@@ -21,6 +21,8 @@
 	"include": [
 		"next-env.d.ts",
 		"next.config.ts",
+		"prisma.config.ts",
+		"prisma/**/*.ts",
 		"src/**/*.ts",
 		"src/**/*.tsx",
 		"src/**/*.mts",

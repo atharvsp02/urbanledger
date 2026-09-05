@@ -1,0 +1,533 @@
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  moduleFormat = "esm"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum AccessRole {
+  ADMIN
+  ACCOUNTANT
+  CONTACT
+}
+
+enum UserStatus {
+  PROVISIONING
+  ACTIVE
+  DISABLED
+}
+
+enum PortalAccessStatus {
+  ACTIVE
+  REVOKED
+}
+
+enum ProvisioningKind {
+  PUBLIC_ACCOUNTANT
+  ADMIN
+  CONTACT
+}
+
+enum ProvisioningState {
+  PENDING
+  AUTH_CREATED
+  COMPLETED
+  FAILED
+}
+
+enum ContactKind {
+  CUSTOMER
+  VENDOR
+  BOTH
+}
+
+enum ProductKind {
+  GOODS
+  SERVICE
+  COMBO
+}
+
+enum AccountType {
+  ASSET
+  LIABILITY
+  EXPENSE
+  INCOME
+  CAPITAL
+}
+
+enum AccountSubtype {
+  GENERAL
+  CASH
+  BANK
+  RECEIVABLE
+  PAYABLE
+  INPUT_TAX
+  OUTPUT_TAX
+}
+
+enum JournalType {
+  SALES
+  PURCHASE
+  BANK
+  CASH
+  GENERAL
+  OPENING
+}
+
+enum TaxScope {
+  SALES
+  PURCHASE
+  BOTH
+}
+
+enum AnalyticType {
+  INCOME
+  EXPENSE
+}
+
+enum EntryState {
+  DRAFT
+  POSTED
+}
+
+enum EntrySource {
+  OPENING
+  MANUAL
+  CUSTOMER_INVOICE
+  VENDOR_BILL
+  CUSTOMER_PAYMENT
+  VENDOR_PAYMENT
+  REVERSAL
+}
+
+enum SequenceKind {
+  CUSTOMER_INVOICE
+  VENDOR_BILL
+  CUSTOMER_PAYMENT
+  VENDOR_PAYMENT
+  JOURNAL_ENTRY
+}
+
+model Business {
+  id                   String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  slug                 String                  @unique @db.VarChar(64)
+  name                 String                  @db.VarChar(160)
+  currency             String                  @default("INR") @db.Char(3)
+  timezone             String                  @default("Asia/Kolkata") @db.VarChar(64)
+  fiscalYearStartMonth Int                     @default(4)
+  fiscalYearStartDay   Int                     @default(1)
+  accountingLockDate   DateTime?               @db.Date
+  readyAt              DateTime?               @db.Timestamptz(6)
+  createdAt            DateTime                @default(now()) @db.Timestamptz(6)
+  updatedAt            DateTime                @updatedAt @db.Timestamptz(6)
+  staffGrants          StaffGrant[]
+  portalAccess         PortalAccess[]
+  provisioning         ProvisioningOperation[]
+  contacts             Contact[]
+  productCategories    ProductCategory[]
+  products             Product[]
+  ledgerAccounts       LedgerAccount[]
+  journals             Journal[]
+  taxes                Tax[]
+  analyticAccounts     AnalyticAccount[]
+  budgets              Budget[]
+  fileAssets           FileAsset[]
+  entries              JournalEntry[]
+  sequences            DocumentSequence[]
+  operations           CommandOperation[]
+  auditEvents          AuditEvent[]
+
+  @@map("businesses")
+}
+
+model ApplicationUser {
+  id                     String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  providerUserId         String                  @unique @db.Uuid
+  loginId                String                  @db.VarChar(12)
+  normalizedLoginId      String                  @unique @db.VarChar(12)
+  normalizedEmail        String                  @unique @db.VarChar(320)
+  displayName            String                  @db.VarChar(160)
+  status                 UserStatus              @default(PROVISIONING)
+  mustChangePassword     Boolean                 @default(false)
+  disabledAt             DateTime?               @db.Timestamptz(6)
+  createdAt              DateTime                @default(now()) @db.Timestamptz(6)
+  updatedAt              DateTime                @updatedAt @db.Timestamptz(6)
+  staffGrants            StaffGrant[]            @relation("GrantUser")
+  issuedStaffGrants      StaffGrant[]            @relation("GrantIssuer")
+  portalAccess           PortalAccess?           @relation("PortalUser")
+  issuedPortalAccess     PortalAccess[]          @relation("PortalIssuer")
+  provisioningOperations ProvisioningOperation[] @relation("ProvisioningActor")
+  responsibleBudgets     Budget[]                @relation("BudgetResponsible")
+  createdEntries         JournalEntry[]          @relation("EntryCreator")
+  commandOperations      CommandOperation[]      @relation("CommandActor")
+  auditEvents            AuditEvent[]            @relation("AuditActor")
+
+  @@index([status])
+  @@map("application_users")
+}
+
+model StaffGrant {
+  id          String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId      String           @db.Uuid
+  businessId  String           @db.Uuid
+  role        AccessRole
+  validFrom   DateTime         @default(now()) @db.Timestamptz(6)
+  validUntil  DateTime?        @db.Timestamptz(6)
+  revokedAt   DateTime?        @db.Timestamptz(6)
+  grantedById String?          @db.Uuid
+  createdAt   DateTime         @default(now()) @db.Timestamptz(6)
+  updatedAt   DateTime         @updatedAt @db.Timestamptz(6)
+  user        ApplicationUser  @relation("GrantUser", fields: [userId], references: [id], onDelete: Restrict)
+  business    Business         @relation(fields: [businessId], references: [id], onDelete: Restrict)
+  grantedBy   ApplicationUser? @relation("GrantIssuer", fields: [grantedById], references: [id], onDelete: SetNull)
+
+  @@unique([userId, businessId, role])
+  @@index([businessId, role, revokedAt])
+  @@map("staff_grants")
+}
+
+model PortalAccess {
+  id          String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId      String             @unique @db.Uuid
+  businessId  String             @db.Uuid
+  contactId   String             @unique @db.Uuid
+  status      PortalAccessStatus @default(ACTIVE)
+  grantedById String?            @db.Uuid
+  grantedAt   DateTime           @default(now()) @db.Timestamptz(6)
+  revokedAt   DateTime?          @db.Timestamptz(6)
+  updatedAt   DateTime           @updatedAt @db.Timestamptz(6)
+  user        ApplicationUser    @relation("PortalUser", fields: [userId], references: [id], onDelete: Restrict)
+  business    Business           @relation(fields: [businessId], references: [id], onDelete: Restrict)
+  contact     Contact            @relation(fields: [contactId], references: [id], onDelete: Restrict)
+  grantedBy   ApplicationUser?   @relation("PortalIssuer", fields: [grantedById], references: [id], onDelete: SetNull)
+
+  @@index([businessId, status])
+  @@map("portal_access")
+}
+
+model ProvisioningOperation {
+  id                String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  businessId        String?           @db.Uuid
+  actorUserId       String?           @db.Uuid
+  operationKey      String            @unique @db.Uuid
+  kind              ProvisioningKind
+  normalizedLoginId String            @db.VarChar(12)
+  normalizedEmail   String            @db.VarChar(320)
+  requestHash       String            @db.Char(64)
+  providerUserId    String?           @db.Uuid
+  state             ProvisioningState @default(PENDING)
+  safeFailureCode   String?           @db.VarChar(64)
+  createdAt         DateTime          @default(now()) @db.Timestamptz(6)
+  updatedAt         DateTime          @updatedAt @db.Timestamptz(6)
+  business          Business?         @relation(fields: [businessId], references: [id], onDelete: Restrict)
+  actor             ApplicationUser?  @relation("ProvisioningActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([normalizedLoginId])
+  @@index([normalizedEmail])
+  @@map("provisioning_operations")
+}
+
+model Contact {
+  id           String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  businessId   String        @db.Uuid
+  kind         ContactKind
+  name         String        @db.VarChar(160)
+  email        String?       @db.VarChar(320)
+  mobile       String?       @db.VarChar(32)
+  street       String?       @db.VarChar(240)
+  city         String?       @db.VarChar(100)
+  state        String?       @db.VarChar(100)
+  pincode      String?       @db.VarChar(16)
+  imageAssetId String?       @unique @db.Uuid
+  revision     Int           @default(1)
+  archivedAt   DateTime?     @db.Timestamptz(6)
+  createdAt    DateTime      @default(now()) @db.Timestamptz(6)
+  updatedAt    DateTime      @updatedAt @db.Timestamptz(6)
+  business     Business      @relation(fields: [businessId], references: [id], onDelete: Restrict)
+  imageAsset   FileAsset?    @relation("ContactImage", fields: [imageAssetId], references: [id], onDelete: SetNull)
+  portalAccess PortalAccess?
+  journalItems JournalItem[]
+
+  @@index([businessId, kind, archivedAt])
+  @@index([businessId, name])
+  @@map("contacts")
+}
+
+model ProductCategory {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  businessId String    @db.Uuid
+  name       String    @db.VarChar(120)
+  archivedAt DateTime? @db.Timestamptz(6)
+  createdAt  DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt  DateTime  @updatedAt @db.Timestamptz(6)
+  business   Business  @relation(fields: [businessId], references: [id], onDelete: Restrict)
+  products   Product[]
+
+  @@unique([businessId, name])
+  @@map("product_categories")
+}
+
+model Product {
+  id           String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  businessId   String          @db.Uuid
+  categoryId   String          @db.Uuid
+  name         String          @db.VarChar(160)
+  sku          String?         @db.VarChar(64)
+  kind         ProductKind
+  salesPrice   Decimal         @db.Decimal(20, 4)
+  purchaseCost Decimal         @db.Decimal(20, 4)
+  revision     Int             @default(1)
+  archivedAt   DateTime?       @db.Timestamptz(6)
+  createdAt    DateTime        @default(now()) @db.Timestamptz(6)
+  updatedAt    DateTime        @updatedAt @db.Timestamptz(6)
+  business     Business        @relation(fields: [businessId], references: [id], onDelete: Restrict)
+  category     ProductCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+
+  @@unique([businessId, sku])
+  @@index([businessId, kind, archivedAt])
+  @@map("products")
+}
+
+model LedgerAccount {
+  id                       String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  businessId               String         @db.Uuid
+  code                     String         @db.VarChar(32)
+  name                     String         @db.VarChar(160)
+  type                     AccountType
+  subtype                  AccountSubtype @default(GENERAL)
+  revision                 Int            @default(1)
+  archivedAt               DateTime?      @db.Timestamptz(6)
+  createdAt                DateTime       @default(now()) @db.Timestamptz(6)
+  updatedAt                DateTime       @updatedAt @db.Timestamptz(6)
+  business                 Business       @relation(fields: [businessId], references: [id], onDelete: Restrict)
+  incomeJournalDefaults    Journal[]      @relation("JournalIncomeAccount")
+  expenseJournalDefaults   Journal[]      @relation("JournalExpenseAccount")
+  controlJournalDefaults   Journal[]      @relation("JournalControlAccount")
+  liquidityJournalDefaults Journal[]      @relation("JournalLiquidityAccount")
+  taxInputs                Tax[]          @relation("TaxInputAccount")
+  taxOutputs               Tax[]          @relation("TaxOutputAccount")
+  journalItems             JournalItem[]
+
+  @@unique([businessId, code])
+  @@index([businessId, type, archivedAt])
+  @@map("ledger_accounts")
+}
+
+model Journal {
+  id                        String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  businessId                String         @db.Uuid
+  code                      String         @db.VarChar(16)
+  name                      String         @db.VarChar(120)
+  type                      JournalType
+  defaultIncomeAccountId    String?        @db.Uuid
+  defaultExpenseAccountId   String?        @db.Uuid
+  defaultControlAccountId   String?        @db.Uuid
+  defaultLiquidityAccountId String?        @db.Uuid
+  revision                  Int            @default(1)
+  archivedAt                DateTime?      @db.Timestamptz(6)
+  createdAt                 DateTime       @default(now()) @db.Timestamptz(6)
+  updatedAt                 DateTime       @updatedAt @db.Timestamptz(6)
+  business                  Business       @relation(fields: [businessId], references: [id], onDelete: Restrict)
+  defaultIncomeAccount      LedgerAccount? @relation("JournalIncomeAccount", fields: [defaultIncomeAccountId], references: [id], onDelete: Restrict)
+  defaultExpenseAccount     LedgerAccount? @relation("JournalExpenseAccount", fields: [defaultExpenseAccountId], references: [id], onDelete: Restrict)
+  defaultControlAccount     LedgerAccount? @relation("JournalControlAccount", fields: [defaultControlAccountId], references: [id], onDelete: Restrict)
+  defaultLiquidityAccount   LedgerAccount? @relation("JournalLiquidityAccount", fields: [defaultLiquidityAccountId], references: [id], onDelete: Restrict)
+  entries                   JournalEntry[]
+
+  @@unique([businessId, code])
+  @@index([businessId, type, archivedAt])
+  @@map("journals")
+}
+
+model Tax {
+  id              String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  businessId      String         @db.Uuid
+  name            String         @db.VarChar(120)
+  rate            Decimal        @db.Decimal(7, 4)
+  scope           TaxScope
+  inputAccountId  String?        @db.Uuid
+  outputAccountId String?        @db.Uuid
+  revision        Int            @default(1)
+  archivedAt      DateTime?      @db.Timestamptz(6)
+  createdAt       DateTime       @default(now()) @db.Timestamptz(6)
+  updatedAt       DateTime       @updatedAt @db.Timestamptz(6)
+  business        Business       @relation(fields: [businessId], references: [id], onDelete: Restrict)
+  inputAccount    LedgerAccount? @relation("TaxInputAccount", fields: [inputAccountId], references: [id], onDelete: Restrict)
+  outputAccount   LedgerAccount? @relation("TaxOutputAccount", fields: [outputAccountId], references: [id], onDelete: Restrict)
+
+  @@unique([businessId, name])
+  @@index([businessId, archivedAt])
+  @@map("taxes")
+}
+
+model AnalyticAccount {
+  id           String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  businessId   String        @db.Uuid
+  name         String        @db.VarChar(120)
+  type         AnalyticType
+  revision     Int           @default(1)
+  archivedAt   DateTime?     @db.Timestamptz(6)
+  createdAt    DateTime      @default(now()) @db.Timestamptz(6)
+  updatedAt    DateTime      @updatedAt @db.Timestamptz(6)
+  business     Business      @relation(fields: [businessId], references: [id], onDelete: Restrict)
+  budgetLines  BudgetLine[]
+  journalItems JournalItem[]
+
+  @@unique([businessId, name])
+  @@index([businessId, type, archivedAt])
+  @@map("analytic_accounts")
+}
+
+model Budget {
+  id                      String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  businessId              String          @db.Uuid
+  name                    String          @db.VarChar(160)
+  startsOn                DateTime        @db.Date
+  endsOn                  DateTime        @db.Date
+  responsibleUserId       String          @db.Uuid
+  responsibleNameSnapshot String          @db.VarChar(160)
+  revision                Int             @default(1)
+  archivedAt              DateTime?       @db.Timestamptz(6)
+  createdAt               DateTime        @default(now()) @db.Timestamptz(6)
+  updatedAt               DateTime        @updatedAt @db.Timestamptz(6)
+  business                Business        @relation(fields: [businessId], references: [id], onDelete: Restrict)
+  responsibleUser         ApplicationUser @relation("BudgetResponsible", fields: [responsibleUserId], references: [id], onDelete: Restrict)
+  lines                   BudgetLine[]
+
+  @@unique([businessId, name, startsOn, endsOn])
+  @@index([businessId, startsOn, endsOn])
+  @@map("budgets")
+}
+
+model BudgetLine {
+  id                String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  budgetId          String          @db.Uuid
+  analyticAccountId String          @db.Uuid
+  plannedAmount     Decimal         @db.Decimal(20, 2)
+  createdAt         DateTime        @default(now()) @db.Timestamptz(6)
+  updatedAt         DateTime        @updatedAt @db.Timestamptz(6)
+  budget            Budget          @relation(fields: [budgetId], references: [id], onDelete: Cascade)
+  analyticAccount   AnalyticAccount @relation(fields: [analyticAccountId], references: [id], onDelete: Restrict)
+
+  @@unique([budgetId, analyticAccountId])
+  @@map("budget_lines")
+}
+
+model FileAsset {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  businessId   String   @db.Uuid
+  storageKey   String   @unique @db.VarChar(512)
+  mimeType     String   @db.VarChar(64)
+  byteSize     Int
+  width        Int
+  height       Int
+  verifiedAt   DateTime @db.Timestamptz(6)
+  createdAt    DateTime @default(now()) @db.Timestamptz(6)
+  business     Business @relation(fields: [businessId], references: [id], onDelete: Restrict)
+  contactImage Contact? @relation("ContactImage")
+
+  @@index([businessId])
+  @@map("file_assets")
+}
+
+model JournalEntry {
+  id                String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  businessId        String          @db.Uuid
+  journalId         String          @db.Uuid
+  postingDate       DateTime        @db.Date
+  reference         String          @db.VarChar(160)
+  state             EntryState      @default(DRAFT)
+  source            EntrySource
+  sourceReference   String?         @db.Uuid
+  reversalOfEntryId String?         @unique @db.Uuid
+  createdById       String          @db.Uuid
+  postedAt          DateTime?       @db.Timestamptz(6)
+  createdAt         DateTime        @default(now()) @db.Timestamptz(6)
+  updatedAt         DateTime        @updatedAt @db.Timestamptz(6)
+  business          Business        @relation(fields: [businessId], references: [id], onDelete: Restrict)
+  journal           Journal         @relation(fields: [journalId], references: [id], onDelete: Restrict)
+  createdBy         ApplicationUser @relation("EntryCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  reversalOf        JournalEntry?   @relation("EntryReversal", fields: [reversalOfEntryId], references: [id], onDelete: Restrict)
+  reversedBy        JournalEntry?   @relation("EntryReversal")
+  items             JournalItem[]
+
+  @@index([businessId, postingDate, state])
+  @@index([journalId, postingDate])
+  @@map("journal_entries")
+}
+
+model JournalItem {
+  id                String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  entryId           String           @db.Uuid
+  accountId         String           @db.Uuid
+  contactId         String?          @db.Uuid
+  analyticAccountId String?          @db.Uuid
+  description       String?          @db.VarChar(240)
+  debit             Decimal          @default(0) @db.Decimal(20, 2)
+  credit            Decimal          @default(0) @db.Decimal(20, 2)
+  createdAt         DateTime         @default(now()) @db.Timestamptz(6)
+  entry             JournalEntry     @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  account           LedgerAccount    @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  contact           Contact?         @relation(fields: [contactId], references: [id], onDelete: Restrict)
+  analyticAccount   AnalyticAccount? @relation(fields: [analyticAccountId], references: [id], onDelete: Restrict)
+
+  @@index([entryId])
+  @@index([accountId, entryId])
+  @@index([contactId])
+  @@map("journal_items")
+}
+
+model DocumentSequence {
+  id         String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  businessId String       @db.Uuid
+  kind       SequenceKind
+  period     String       @db.VarChar(16)
+  prefix     String       @db.VarChar(24)
+  nextNumber BigInt       @default(1)
+  createdAt  DateTime     @default(now()) @db.Timestamptz(6)
+  updatedAt  DateTime     @updatedAt @db.Timestamptz(6)
+  business   Business     @relation(fields: [businessId], references: [id], onDelete: Restrict)
+
+  @@unique([businessId, kind, period])
+  @@map("document_sequences")
+}
+
+model CommandOperation {
+  id           String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  businessId   String           @db.Uuid
+  actorUserId  String?          @db.Uuid
+  operationKey String           @db.Uuid
+  operation    String           @db.VarChar(80)
+  requestHash  String           @db.Char(64)
+  resourceId   String?          @db.Uuid
+  result       Json?
+  committedAt  DateTime?        @db.Timestamptz(6)
+  createdAt    DateTime         @default(now()) @db.Timestamptz(6)
+  business     Business         @relation(fields: [businessId], references: [id], onDelete: Restrict)
+  actor        ApplicationUser? @relation("CommandActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@unique([businessId, operationKey])
+  @@index([businessId, operation, createdAt])
+  @@map("command_operations")
+}
+
+model AuditEvent {
+  id          String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  businessId  String           @db.Uuid
+  actorUserId String?          @db.Uuid
+  action      String           @db.VarChar(100)
+  targetType  String           @db.VarChar(80)
+  targetId    String           @db.Uuid
+  requestId   String           @db.Uuid
+  details     Json?
+  occurredAt  DateTime         @default(now()) @db.Timestamptz(6)
+  business    Business         @relation(fields: [businessId], references: [id], onDelete: Restrict)
+  actor       ApplicationUser? @relation("AuditActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([businessId, occurredAt])
+  @@index([targetType, targetId])
+  @@map("audit_events")
+}

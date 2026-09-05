@@ -33,9 +33,9 @@ type BudgetTransaction = Prisma.TransactionClient
 const budgetInclude = {
 	lines: {
 		include: { analyticAccount: { select: { id: true, name: true, type: true } } },
-		orderBy: [{ analyticAccount: { name: 'asc' as const } }, { id: 'asc' as const }]
+		orderBy: [{ analyticAccount: { name: 'asc' } }, { id: 'asc' }]
 	}
-} as const
+} satisfies Prisma.BudgetInclude
 
 function validationFailure(error: z.ZodError): ActionResult<never> {
 	return {

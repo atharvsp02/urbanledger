@@ -132,7 +132,13 @@ export async function getPaymentOptions(
 				orderBy: [{ name: 'asc' }, { id: 'asc' }]
 			})
 
-			return { document, liquidityJournals } satisfies PaymentOptions
+			return {
+				document,
+				liquidityJournals: liquidityJournals.map((journal) => ({
+					...journal,
+					type: journal.type as 'BANK' | 'CASH'
+				}))
+			} satisfies PaymentOptions
 		})
 		return { ok: true, data: result }
 	} catch (error) {

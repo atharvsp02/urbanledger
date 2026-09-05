@@ -431,7 +431,14 @@ export async function getOpeningBalanceOptions(
 					orderBy: [{ code: 'asc' }, { id: 'asc' }]
 				})
 			])
-			return { openingJournals, liquidityAccounts, capitalAccounts }
+			return {
+				openingJournals,
+				liquidityAccounts: liquidityAccounts.map((account) => ({
+					...account,
+					subtype: account.subtype as 'CASH' | 'BANK'
+				})),
+				capitalAccounts
+			} satisfies OpeningBalanceOptions
 		})
 		return { ok: true, data: result }
 	} catch (error) {

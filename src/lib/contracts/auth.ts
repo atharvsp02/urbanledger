@@ -32,5 +32,7 @@ export type LoginInput = z.input<typeof loginInputSchema>
 export type SignupInput = z.input<typeof signupInputSchema>
 export type PasswordRecoveryInput = z.input<typeof passwordRecoveryInputSchema>
 
-export type LoginResult = { redirectTo: '/dashboard' | '/portal' | '/access-denied' }
+export type LoginResult = {
+	redirectTo: '/dashboard' | '/portal' | '/access-denied' | '/change-password'
+}
 export type SignupResult = { loginId: string; confirmationRequired: true }

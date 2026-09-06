@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import type { Role } from '@/lib/contracts/access'
 import { buttonVariants } from '@/components/ui/button'
+import { ContactAvatar } from '@/components/ui/placeholder'
 
 const ROLE_LABELS: Record<Role, string> = {
 	ADMIN: 'Admin',
@@ -11,28 +12,40 @@ const ROLE_LABELS: Record<Role, string> = {
 export function AccountBlock({
 	displayName,
 	role,
+	imageUrl,
+	profileHref,
 	signOutAction
 }: {
 	displayName: string
 	role: Role
+	imageUrl?: string
+	profileHref?: string
 	signOutAction: () => Promise<void>
 }) {
+	const identity = (
+		<>
+			<ContactAvatar name={displayName} imageUrl={imageUrl} className="size-8" />
+			<span className="min-w-0">
+				<span className="block truncate text-[13px] font-medium text-foreground">
+					{displayName}
+				</span>
+				<span className="block text-xs text-muted-foreground">{ROLE_LABELS[role]}</span>
+			</span>
+		</>
+	)
+
 	return (
 		<div className="flex flex-col gap-3">
-			<div className="flex items-start gap-2.5">
-				<span
-					aria-hidden="true"
-					className="mt-0.5 grid size-8 shrink-0 place-items-center rounded-full bg-surface-tint text-[11px] font-semibold text-accent"
+			{profileHref == null ? (
+				<div className="flex items-start gap-2.5">{identity}</div>
+			) : (
+				<Link
+					href={profileHref}
+					className="flex items-start gap-2.5 rounded-lg p-1 transition-colors hover:bg-surface-hover motion-reduce:transition-none"
 				>
-					{displayName.slice(0, 2).toUpperCase()}
-				</span>
-				<span className="min-w-0">
-					<span className="block truncate text-[13px] font-medium text-foreground">
-						{displayName}
-					</span>
-					<span className="block text-xs text-muted-foreground">{ROLE_LABELS[role]}</span>
-				</span>
-			</div>
+					{identity}
+				</Link>
+			)}
 			<Link
 				href="/change-password"
 				className={buttonVariants({ variant: 'ghost', size: 'sm', className: 'w-full' })}

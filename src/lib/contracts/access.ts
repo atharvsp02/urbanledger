@@ -34,9 +34,16 @@ export type Actor = {
 	contactId: string | null
 	displayName: string
 	capabilities: readonly Capability[]
+	mustChangePassword?: boolean
 }
 
 export type SessionActor = Pick<
 	Actor,
-	'userId' | 'businessId' | 'role' | 'contactId' | 'displayName' | 'capabilities'
+	| 'userId'
+	| 'businessId'
+	| 'role'
+	| 'contactId'
+	| 'displayName'
+	| 'capabilities'
+	| 'mustChangePassword'
 >

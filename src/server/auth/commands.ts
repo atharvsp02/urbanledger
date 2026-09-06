@@ -189,6 +189,10 @@ export async function loginWithPassword(input: LoginInput): Promise<ActionResult
 			? '/portal'
 			: '/access-denied'
 
+	if (destination !== '/access-denied' && user.mustChangePassword) {
+		return { ok: true, data: { redirectTo: '/change-password' } }
+	}
+
 	return {
 		ok: true,
 		data: {

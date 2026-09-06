@@ -29,6 +29,10 @@ export default async function WorkspaceLayout({ children }: { children: React.Re
 		redirect('/portal')
 	}
 
+	if (actor.mustChangePassword) {
+		redirect('/change-password')
+	}
+
 	return (
 		<AppShell
 			productLabel="Accounting"

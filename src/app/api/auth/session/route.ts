@@ -14,7 +14,8 @@ export async function GET() {
 				role: actor.role,
 				contactId: actor.contactId,
 				displayName: actor.displayName,
-				capabilities: actor.capabilities
+				capabilities: actor.capabilities,
+				mustChangePassword: actor.mustChangePassword
 			}
 		}
 

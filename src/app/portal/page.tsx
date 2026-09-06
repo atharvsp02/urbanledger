@@ -3,6 +3,7 @@ import { FileText, Inbox, Wallet } from 'lucide-react'
 import { PageHeader, WorkSurface } from '@/components/app-shell/page-header'
 import { DataTable, type TableColumn } from '@/components/ui/data-table'
 import { EmptyState, ErrorState } from '@/components/ui/state-panel'
+import { Pagination } from '@/components/ui/pagination'
 import type { PortalDocumentSummary, PortalPaymentSummary } from '@/lib/contracts/portal'
 import { formatAmount, formatBusinessDate } from '@/lib/format'
 import { getActor } from '@/server/auth/actor'
@@ -14,6 +15,23 @@ import {
 import { PortalPaymentStatusBadge, PortalStatusBadge } from '@/app/portal/portal-presentation'
 
 export const dynamic = 'force-dynamic'
+
+const PAGE_SIZE = 10
+
+type PortalParams = { invoicePage?: string; billPage?: string; paymentPage?: string }
+
+function pageNumber(value?: string) {
+	return Math.max(1, Number(value ?? '1') || 1)
+}
+
+function buildPortalHref(params: PortalParams, patch: PortalParams) {
+	const query = new URLSearchParams()
+	for (const [name, value] of Object.entries({ ...params, ...patch })) {
+		if (value != null && value !== '' && value !== '1') query.set(name, value)
+	}
+	const queryString = query.toString()
+	return queryString === '' ? '/portal' : `/portal?${queryString}`
+}
 
 function documentColumns(basePath: string): readonly TableColumn<PortalDocumentSummary>[] {
 	return [
@@ -82,12 +100,20 @@ const paymentColumns: readonly TableColumn<PortalPaymentSummary>[] = [
 	}
 ]
 
-export default async function PortalPage() {
+export default async function PortalPage({
+	searchParams
+}: {
+	searchParams: Promise<PortalParams>
+}) {
+	const params = await searchParams
 	const actor = await getActor()
 	const [invoices, bills, payments] = await Promise.all([
-		listPortalCustomerInvoices(actor, {}),
-		listPortalVendorBills(actor, {}),
-		listPortalPayments(actor, {})
+		listPortalCustomerInvoices(actor, {
+			page: pageNumber(params.invoicePage),
+			pageSize: PAGE_SIZE
+		}),
+		listPortalVendorBills(actor, { page: pageNumber(params.billPage), pageSize: PAGE_SIZE }),
+		listPortalPayments(actor, { page: pageNumber(params.paymentPage), pageSize: PAGE_SIZE })
 	])
 
 	if (!invoices.ok) return <ErrorState description={invoices.error.message} />
@@ -126,6 +152,13 @@ export default async function PortalPage() {
 						rows={invoices.data.rows}
 						getRowKey={(document) => document.id}
 					/>
+					<Pagination
+						page={invoices.data.page}
+						pageSize={invoices.data.pageSize}
+						totalCount={invoices.data.totalCount}
+						itemNoun="invoices"
+						buildHref={(page) => buildPortalHref(params, { invoicePage: String(page) })}
+					/>
 				</WorkSurface>
 			)}
 
@@ -141,6 +174,13 @@ export default async function PortalPage() {
 						rows={bills.data.rows}
 						getRowKey={(document) => document.id}
 					/>
+					<Pagination
+						page={bills.data.page}
+						pageSize={bills.data.pageSize}
+						totalCount={bills.data.totalCount}
+						itemNoun="bills"
+						buildHref={(page) => buildPortalHref(params, { billPage: String(page) })}
+					/>
 				</WorkSurface>
 			)}
 
@@ -151,6 +191,13 @@ export default async function PortalPage() {
 						columns={paymentColumns}
 						rows={payments.data.rows}
 						getRowKey={(payment) => payment.id}
+					/>
+					<Pagination
+						page={payments.data.page}
+						pageSize={payments.data.pageSize}
+						totalCount={payments.data.totalCount}
+						itemNoun="payments"
+						buildHref={(page) => buildPortalHref(params, { paymentPage: String(page) })}
 					/>
 				</WorkSurface>
 			)}

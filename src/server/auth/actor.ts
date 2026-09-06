@@ -61,7 +61,8 @@ export async function getActor(): Promise<Actor> {
 			role,
 			contactId: null,
 			displayName: user.displayName,
-			capabilities: capabilitiesByRole[role]
+			capabilities: capabilitiesByRole[role],
+			mustChangePassword: user.mustChangePassword
 		}
 	}
 
@@ -73,7 +74,8 @@ export async function getActor(): Promise<Actor> {
 			role: 'CONTACT',
 			contactId: portalAccess.contactId,
 			displayName: user.displayName,
-			capabilities: capabilitiesByRole.CONTACT
+			capabilities: capabilitiesByRole.CONTACT,
+			mustChangePassword: user.mustChangePassword
 		}
 	}
 

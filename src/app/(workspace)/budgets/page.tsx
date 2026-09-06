@@ -149,10 +149,7 @@ export default async function BudgetsPage({
 				/>
 			</ListToolbar>
 
-			<Suspense
-				key={`${params.q}|${params.archived}|${params.page}`}
-				fallback={<SkeletonTable rows={6} columns={6} />}
-			>
+			<Suspense fallback={<SkeletonTable rows={6} columns={6} />}>
 				<BudgetsTable params={params} />
 			</Suspense>
 		</>

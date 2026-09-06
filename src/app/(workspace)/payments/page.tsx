@@ -4,9 +4,7 @@ import { Wallet } from 'lucide-react'
 import { PageHeader } from '@/components/app-shell/page-header'
 import { buttonVariants } from '@/components/ui/button'
 import { DataTable, type TableColumn } from '@/components/ui/data-table'
-import { Field, FieldRow } from '@/components/ui/field'
-import { TextInput } from '@/components/ui/inputs'
-import { ListToolbar, ToolbarFilter } from '@/components/ui/list-toolbar'
+import { ListToolbar, ToolbarDate, ToolbarFilter } from '@/components/ui/list-toolbar'
 import { Pagination } from '@/components/ui/pagination'
 import { SkeletonTable } from '@/components/ui/skeleton'
 import { EmptyState, ErrorState } from '@/components/ui/state-panel'
@@ -178,24 +176,11 @@ export default async function PaymentsPage({
 						}))
 					]}
 				/>
-				<FieldRow className="sm:w-auto sm:grid-cols-2">
-					<Field id="payments-from" label="From" inRow>
-						{(props) => (
-							<TextInput {...props} type="date" name="from" defaultValue={params.from ?? ''} />
-						)}
-					</Field>
-					<Field id="payments-to" label="To" inRow>
-						{(props) => (
-							<TextInput {...props} type="date" name="to" defaultValue={params.to ?? ''} />
-						)}
-					</Field>
-				</FieldRow>
+				<ToolbarDate label="From" name="from" defaultValue={params.from ?? ''} />
+				<ToolbarDate label="To" name="to" defaultValue={params.to ?? ''} />
 			</ListToolbar>
 
-			<Suspense
-				key={`${params.direction}|${params.status}|${params.from}|${params.to}|${params.page}`}
-				fallback={<SkeletonTable rows={6} columns={8} />}
-			>
+			<Suspense fallback={<SkeletonTable rows={6} columns={8} />}>
 				<PaymentsTable params={params} />
 			</Suspense>
 		</>

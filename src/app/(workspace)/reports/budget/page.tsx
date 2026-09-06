@@ -5,8 +5,7 @@ import { PageHeader, WorkSurface } from '@/components/app-shell/page-header'
 import { Badge } from '@/components/ui/badge'
 import { buttonVariants } from '@/components/ui/button'
 import { DataTable, type TableColumn } from '@/components/ui/data-table'
-import { Field, FieldRow } from '@/components/ui/field'
-import { SelectInput, TextInput } from '@/components/ui/inputs'
+import { ListToolbar, ToolbarDate, ToolbarFilter } from '@/components/ui/list-toolbar'
 import { SkeletonTable } from '@/components/ui/skeleton'
 import { EmptyState, ErrorState } from '@/components/ui/state-panel'
 import type { BudgetReportLine } from '@/lib/contracts/budget'
@@ -40,7 +39,6 @@ async function BudgetReportBody({ params }: { params: ReportParams }) {
 	if (!result.ok) return <ErrorState description={result.error.message} />
 
 	const report = result.data
-	const variance = (Number(report.plannedTotal) - Number(report.actualTotal)).toFixed(2)
 
 	const columns: readonly TableColumn<BudgetReportLine>[] = [
 		{
@@ -124,7 +122,7 @@ async function BudgetReportBody({ params }: { params: ReportParams }) {
 						<dt className="text-[11px] font-semibold tracking-[0.05em] text-muted-foreground uppercase">
 							Variance
 						</dt>
-						<dd className="mt-0.5 text-sm tabular-nums">{formatAmount(variance)}</dd>
+						<dd className="mt-0.5 text-sm tabular-nums">{formatAmount(report.varianceTotal)}</dd>
 					</div>
 				</dl>
 				<p className="mt-4 text-sm text-muted-foreground">
@@ -177,53 +175,28 @@ export default async function BudgetReportPage({
 				}
 			/>
 
-			<form
-				method="get"
+			<ListToolbar
 				action="/reports/budget"
-				className="flex flex-col gap-3 rounded-xl border border-border bg-surface p-4 sm:flex-row sm:flex-wrap sm:items-end"
+				hasSearch={false}
+				searchLabel="Filter budget report"
+				resetHref="/reports/budget"
 			>
-				<Field id="report-budget" label="Budget" className="min-w-56" isRequired>
-					{(props) => (
-						<SelectInput {...props} name="budget" defaultValue={params.budget ?? ''}>
-							<option value="">Choose a budget</option>
-							{budgets.ok &&
-								budgets.data.rows.map((budget) => (
-									<option key={budget.id} value={budget.id}>
-										{budget.name}
-									</option>
-								))}
-						</SelectInput>
-					)}
-				</Field>
-				<FieldRow className="sm:w-auto sm:grid-cols-2">
-					<Field id="report-from" label="From" inRow>
-						{(props) => (
-							<TextInput {...props} type="date" name="from" defaultValue={params.from ?? ''} />
-						)}
-					</Field>
-					<Field id="report-to" label="To" inRow>
-						{(props) => (
-							<TextInput {...props} type="date" name="to" defaultValue={params.to ?? ''} />
-						)}
-					</Field>
-				</FieldRow>
-				<div className="flex flex-wrap gap-2">
-					<button type="submit" className={buttonVariants({ size: 'sm' })}>
-						Apply
-					</button>
-					<Link
-						href="/reports/budget"
-						className={buttonVariants({ variant: 'secondary', size: 'sm' })}
-					>
-						Clear
-					</Link>
-				</div>
-			</form>
+				<ToolbarFilter
+					label="Budget"
+					name="budget"
+					defaultValue={params.budget ?? ''}
+					options={[
+						{ value: '', label: 'Choose a budget' },
+						...(budgets.ok
+							? budgets.data.rows.map((budget) => ({ value: budget.id, label: budget.name }))
+							: [])
+					]}
+				/>
+				<ToolbarDate label="From" name="from" defaultValue={params.from ?? ''} />
+				<ToolbarDate label="To" name="to" defaultValue={params.to ?? ''} />
+			</ListToolbar>
 
-			<Suspense
-				key={`${params.budget}|${params.from}|${params.to}`}
-				fallback={<SkeletonTable rows={6} columns={6} />}
-			>
+			<Suspense fallback={<SkeletonTable rows={6} columns={6} />}>
 				<BudgetReportBody params={params} />
 			</Suspense>
 		</>

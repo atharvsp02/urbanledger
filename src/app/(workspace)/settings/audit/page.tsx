@@ -1,12 +1,9 @@
 import { Suspense } from 'react'
-import Link from 'next/link'
 import type { Metadata } from 'next'
 import { ScrollText } from 'lucide-react'
 import { PageHeader } from '@/components/app-shell/page-header'
-import { buttonVariants } from '@/components/ui/button'
 import { DataTable, type TableColumn } from '@/components/ui/data-table'
-import { Field, FieldRow } from '@/components/ui/field'
-import { TextInput } from '@/components/ui/inputs'
+import { ListToolbar, ToolbarDate, ToolbarSearch } from '@/components/ui/list-toolbar'
 import { Pagination } from '@/components/ui/pagination'
 import { SkeletonTable } from '@/components/ui/skeleton'
 import { EmptyState, ErrorState, ForbiddenState } from '@/components/ui/state-panel'
@@ -134,60 +131,25 @@ export default async function AuditPage({ searchParams }: { searchParams: Promis
 				breadcrumbs={[{ label: 'Settings' }, { label: 'Audit' }]}
 			/>
 
-			<form
-				method="get"
+			<ListToolbar
 				action="/settings/audit"
-				className="flex flex-col gap-3 rounded-xl border border-border bg-surface p-4 sm:flex-row sm:flex-wrap sm:items-end"
+				searchName="action"
+				searchLabel="Action"
+				searchPlaceholder="payment.record"
+				searchDefaultValue={params.action ?? ''}
+				resetHref="/settings/audit"
 			>
-				<Field id="audit-action" label="Action" className="sm:w-56">
-					{(props) => (
-						<TextInput
-							{...props}
-							name="action"
-							placeholder="payment.record"
-							defaultValue={params.action ?? ''}
-						/>
-					)}
-				</Field>
-				<Field id="audit-targetType" label="Target type" className="sm:w-48">
-					{(props) => (
-						<TextInput
-							{...props}
-							name="targetType"
-							placeholder="Payment"
-							defaultValue={params.targetType ?? ''}
-						/>
-					)}
-				</Field>
-				<FieldRow className="sm:w-auto sm:grid-cols-2">
-					<Field id="audit-from" label="From" inRow>
-						{(props) => (
-							<TextInput {...props} type="date" name="from" defaultValue={params.from ?? ''} />
-						)}
-					</Field>
-					<Field id="audit-to" label="To" inRow>
-						{(props) => (
-							<TextInput {...props} type="date" name="to" defaultValue={params.to ?? ''} />
-						)}
-					</Field>
-				</FieldRow>
-				<div className="flex flex-wrap gap-2">
-					<button type="submit" className={buttonVariants({ size: 'sm' })}>
-						Apply
-					</button>
-					<Link
-						href="/settings/audit"
-						className={buttonVariants({ variant: 'secondary', size: 'sm' })}
-					>
-						Clear
-					</Link>
-				</div>
-			</form>
+				<ToolbarSearch
+					label="Target type"
+					name="targetType"
+					placeholder="Payment"
+					defaultValue={params.targetType ?? ''}
+				/>
+				<ToolbarDate label="From" name="from" defaultValue={params.from ?? ''} />
+				<ToolbarDate label="To" name="to" defaultValue={params.to ?? ''} />
+			</ListToolbar>
 
-			<Suspense
-				key={`${params.action}|${params.targetType}|${params.from}|${params.to}|${params.page}`}
-				fallback={<SkeletonTable rows={6} columns={5} />}
-			>
+			<Suspense fallback={<SkeletonTable rows={6} columns={5} />}>
 				<AuditTable params={params} />
 			</Suspense>
 		</>

@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useTransition } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Loader2, Search, X } from 'lucide-react'
 import { buttonVariants } from '@/components/ui/button'
 import { fieldControlClassName } from '@/components/ui/field'
@@ -30,9 +30,12 @@ export function ListToolbar({
 	children?: React.ReactNode
 }) {
 	const router = useRouter()
+	const currentSearchParams = useSearchParams()
 	const formRef = useRef<HTMLFormElement>(null)
 	const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 	const [isPending, startTransition] = useTransition()
+	const resetSearchParams = new URLSearchParams(resetHref?.split('?')[1] ?? '')
+	const hasActiveFilters = currentSearchParams.toString() !== resetSearchParams.toString()
 
 	useEffect(
 		() => () => {
@@ -77,13 +80,16 @@ export function ListToolbar({
 		[action, router]
 	)
 
-	function scheduleSearch(value: string) {
+	function scheduleSearch(name: string, value: string) {
 		if (searchTimer.current != null) clearTimeout(searchTimer.current)
-		searchTimer.current = setTimeout(() => navigate({ [searchName]: value }), SEARCH_DELAY_MS)
+		searchTimer.current = setTimeout(() => navigate({ [name]: value }), SEARCH_DELAY_MS)
 	}
 
 	function applyFilters(event: React.ChangeEvent<HTMLFormElement>) {
-		if (event.target instanceof HTMLInputElement && event.target.name === searchName) return
+		if (event.target instanceof HTMLInputElement && event.target.type === 'search') {
+			scheduleSearch(event.target.name, event.target.value)
+			return
+		}
 		if (searchTimer.current != null) clearTimeout(searchTimer.current)
 		navigate()
 	}
@@ -122,14 +128,12 @@ export function ListToolbar({
 							className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
 						/>
 						<input
-							key={searchDefaultValue}
 							id="list-toolbar-search"
 							type="search"
 							name={searchName}
 							defaultValue={searchDefaultValue}
 							placeholder={searchPlaceholder}
 							className={cn(fieldControlClassName, 'pl-9')}
-							onChange={(event) => scheduleSearch(event.target.value)}
 						/>
 					</span>
 				</div>
@@ -147,7 +151,7 @@ export function ListToolbar({
 						Updating
 					</span>
 				)}
-				{resetHref != null && (
+				{resetHref != null && hasActiveFilters && (
 					<button
 						type="button"
 						onClick={clearFilters}
@@ -159,6 +163,42 @@ export function ListToolbar({
 				)}
 			</div>
 		</form>
+	)
+}
+
+export function ToolbarSearch({
+	label,
+	name,
+	placeholder,
+	defaultValue = ''
+}: {
+	label: string
+	name: string
+	placeholder?: string
+	defaultValue?: string
+}) {
+	const id = `list-toolbar-${name}`
+
+	return (
+		<div className="flex min-w-0 flex-1 flex-col gap-1.5 sm:min-w-52">
+			<label htmlFor={id} className="text-sm font-medium text-foreground">
+				{label}
+			</label>
+			<span className="relative block">
+				<Search
+					aria-hidden="true"
+					className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
+				/>
+				<input
+					id={id}
+					type="search"
+					name={name}
+					defaultValue={defaultValue}
+					placeholder={placeholder}
+					className={cn(fieldControlClassName, 'pl-9')}
+				/>
+			</span>
+		</div>
 	)
 }
 

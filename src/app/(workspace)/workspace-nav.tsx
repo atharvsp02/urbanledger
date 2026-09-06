@@ -107,13 +107,6 @@ const NAV_DEFINITION: readonly NavDefinition[] = [
 				icon: <Tags className="size-4" />,
 				href: '/accounting/analytic-accounts',
 				capability: 'masters:read'
-			},
-			{
-				id: 'trial-balance',
-				label: 'Trial balance',
-				icon: <Scale className="size-4" />,
-				href: '/reports/trial-balance',
-				capability: 'reports:read'
 			}
 		]
 	},
@@ -134,6 +127,13 @@ const NAV_DEFINITION: readonly NavDefinition[] = [
 		id: 'reports',
 		label: 'Reports',
 		items: [
+			{
+				id: 'trial-balance',
+				label: 'Trial balance',
+				icon: <Scale className="size-4" />,
+				href: '/reports/trial-balance',
+				capability: 'reports:read'
+			},
 			{
 				id: 'balance-sheet',
 				label: 'Balance sheet',
@@ -280,12 +280,27 @@ const NAV_DEFINITION: readonly NavDefinition[] = [
 	}
 ]
 
+const NAV_ORDER = [
+	'overview',
+	'sales',
+	'purchases',
+	'payments',
+	'master-data',
+	'accounting',
+	'inventory',
+	'planning',
+	'reports',
+	'administration'
+] as const
+
 export function workspaceNavGroups(actor: Actor): readonly ShellNavGroup[] {
-	return NAV_DEFINITION.map((group) => ({
+	const visibleGroups = NAV_DEFINITION.map((group) => ({
 		id: group.id,
 		label: group.label,
 		items: group.items.filter(
 			(item) => item.capability == null || actor.capabilities.includes(item.capability)
 		)
 	})).filter((group) => group.items.length > 0)
+
+	return NAV_ORDER.flatMap((id) => visibleGroups.filter((group) => group.id === id))
 }

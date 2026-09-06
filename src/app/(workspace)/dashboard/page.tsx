@@ -5,8 +5,8 @@ import { PageHeader, WorkSurface } from '@/components/app-shell/page-header'
 import { Badge } from '@/components/ui/badge'
 import { buttonVariants } from '@/components/ui/button'
 import { DataTable, type TableColumn } from '@/components/ui/data-table'
-import { Field, FieldRow } from '@/components/ui/field'
-import { SelectInput, TextInput } from '@/components/ui/inputs'
+import { DonutChart } from '@/components/ui/donut-chart'
+import { ListToolbar, ToolbarDate, ToolbarFilter } from '@/components/ui/list-toolbar'
 import { SkeletonCard } from '@/components/ui/skeleton'
 import { EmptyState, ErrorState } from '@/components/ui/state-panel'
 import type { AgingRow, SalesPerformance } from '@/lib/contracts/reports'
@@ -42,8 +42,8 @@ const DIMENSION_LABELS: Record<SalesPerformance['dimension'], string> = {
 }
 
 function monthsBefore(date: string, months: number) {
-	const [year, month, day] = date.split('-').map(Number)
-	const shifted = new Date(Date.UTC(year, month - 1 - months, day))
+	const [year, month] = date.split('-').map(Number)
+	const shifted = new Date(Date.UTC(year, month - 1 - months, 1))
 	return shifted.toISOString().slice(0, 10)
 }
 
@@ -199,7 +199,10 @@ async function DashboardBody({ params }: { params: DashboardParams }) {
 								period: row.period,
 								revenue: Number(row.revenue),
 								expense: Number(row.expense),
-								profit: Number(row.profit)
+								profit: Number(row.profit),
+								revenueLabel: formatAmount(row.revenue),
+								expenseLabel: formatAmount(row.expense),
+								profitLabel: formatAmount(row.profit)
 							}))}
 						/>
 					)
@@ -248,8 +251,18 @@ async function DashboardBody({ params }: { params: DashboardParams }) {
 						) : (
 							<BarSeries
 								data={liquidity.data.rows.flatMap((row) => [
-									{ label: `${row.accountCode} in`, value: Number(row.inflow), tone: 'success' },
-									{ label: `${row.accountCode} out`, value: Number(row.outflow), tone: 'danger' }
+									{
+										label: `${row.accountCode} in`,
+										value: Number(row.inflow),
+										valueLabel: formatAmount(row.inflow),
+										tone: 'success'
+									},
+									{
+										label: `${row.accountCode} out`,
+										value: Number(row.outflow),
+										valueLabel: formatAmount(row.outflow),
+										tone: 'danger'
+									}
 								])}
 							/>
 						)
@@ -318,11 +331,13 @@ async function DashboardBody({ params }: { params: DashboardParams }) {
 									{
 										label: `${row.analyticAccountName} plan`,
 										value: Number(row.plannedAmount),
+										valueLabel: formatAmount(row.plannedAmount),
 										tone: 'accent' as const
 									},
 									{
 										label: `${row.analyticAccountName} actual`,
 										value: Number(row.actualAmount),
+										valueLabel: formatAmount(row.actualAmount),
 										tone: 'success' as const
 									}
 								])}
@@ -384,12 +399,14 @@ async function DashboardBody({ params }: { params: DashboardParams }) {
 						!receivable.ok ? (
 							<ErrorState description={receivable.error.message} />
 						) : (
-							<BarSeries
+							<DonutChart
 								data={(Object.keys(AGING_LABELS) as AgingRow['bucket'][]).map((bucket) => ({
 									label: AGING_LABELS[bucket],
 									value: Number(receivable.data.buckets[bucket]),
-									tone: bucket === 'CURRENT' ? 'accent' : 'danger'
+									valueLabel: formatAmount(receivable.data.buckets[bucket])
 								}))}
+								centerLabel="Outstanding"
+								centerValue={formatAmount(receivable.data.totalOutstanding)}
 							/>
 						)
 					}
@@ -425,6 +442,7 @@ async function DashboardBody({ params }: { params: DashboardParams }) {
 								data={(Object.keys(AGING_LABELS) as AgingRow['bucket'][]).map((bucket) => ({
 									label: AGING_LABELS[bucket],
 									value: Number(payable.data.buckets[bucket]),
+									valueLabel: formatAmount(payable.data.buckets[bucket]),
 									tone: bucket === 'CURRENT' ? 'accent' : 'danger'
 								}))}
 							/>
@@ -465,7 +483,8 @@ async function DashboardBody({ params }: { params: DashboardParams }) {
 						<BarSeries
 							data={sales.data.rows.slice(0, 10).map((row) => ({
 								label: row.label,
-								value: Number(row.netSales)
+								value: Number(row.netSales),
+								valueLabel: formatAmount(row.netSales)
 							}))}
 						/>
 					)
@@ -545,49 +564,31 @@ export default async function DashboardPage({
 				lead={`Financial position and activity for ${actor.displayName}.`}
 			/>
 
-			<form
-				method="get"
+			<ListToolbar
 				action="/dashboard"
-				className="flex flex-col gap-3 rounded-xl border border-border bg-surface p-4 sm:flex-row sm:flex-wrap sm:items-end"
+				hasSearch={false}
+				searchLabel="Filter dashboard"
+				resetHref="/dashboard"
 			>
-				<FieldRow className="sm:w-auto sm:grid-cols-2">
-					<Field id="dashboard-from" label="Activity from" inRow>
-						{(props) => (
-							<TextInput
-								{...props}
-								type="date"
-								name="from"
-								defaultValue={params.from ?? monthsBefore(params.asOf || today, 5)}
-							/>
-						)}
-					</Field>
-					<Field id="dashboard-asOf" label="As of" inRow>
-						{(props) => (
-							<TextInput {...props} type="date" name="asOf" defaultValue={params.asOf ?? today} />
-						)}
-					</Field>
-				</FieldRow>
-				<Field id="dashboard-dimension" label="Sales grouped by" className="sm:w-48">
-					{(props) => (
-						<SelectInput {...props} name="dimension" defaultValue={params.dimension ?? 'PRODUCT'}>
-							<option value="PRODUCT">Product</option>
-							<option value="CATEGORY">Category</option>
-							<option value="CUSTOMER">Customer</option>
-						</SelectInput>
-					)}
-				</Field>
-				<div className="flex flex-wrap gap-2">
-					<button type="submit" className={buttonVariants({ size: 'sm' })}>
-						Apply
-					</button>
-					<Link href="/dashboard" className={buttonVariants({ variant: 'secondary', size: 'sm' })}>
-						Reset
-					</Link>
-				</div>
-			</form>
+				<ToolbarDate
+					label="Activity from"
+					name="from"
+					defaultValue={params.from ?? monthsBefore(params.asOf || today, 5)}
+				/>
+				<ToolbarDate label="As of" name="asOf" defaultValue={params.asOf ?? today} />
+				<ToolbarFilter
+					label="Sales grouped by"
+					name="dimension"
+					defaultValue={params.dimension ?? 'PRODUCT'}
+					options={[
+						{ value: 'PRODUCT', label: 'Product' },
+						{ value: 'CATEGORY', label: 'Category' },
+						{ value: 'CUSTOMER', label: 'Customer' }
+					]}
+				/>
+			</ListToolbar>
 
 			<Suspense
-				key={`${params.asOf}|${params.from}|${params.dimension}`}
 				fallback={
 					<div className="grid gap-4">
 						<SkeletonCard rows={4} />

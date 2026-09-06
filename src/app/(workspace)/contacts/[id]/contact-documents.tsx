@@ -2,7 +2,7 @@ import { FileText } from 'lucide-react'
 import { WorkSurface } from '@/components/app-shell/page-header'
 import { Badge } from '@/components/ui/badge'
 import { DataTable, type TableColumn } from '@/components/ui/data-table'
-import { EmptyState, ErrorState } from '@/components/ui/state-panel'
+import { EmptyState, ErrorState, ForbiddenState } from '@/components/ui/state-panel'
 import type { ContactDocumentSummaries } from '@/lib/contracts/portal'
 import { formatAmount, formatBusinessDate } from '@/lib/format'
 import { getActor } from '@/server/auth/actor'
@@ -122,7 +122,11 @@ export async function ContactDocuments({ contactId }: { contactId: string }) {
 	if (!result.ok) {
 		return (
 			<WorkSurface title="Related documents">
-				<ErrorState description={result.error.message} />
+				{result.error.code === 'FORBIDDEN' ? (
+					<ForbiddenState description={result.error.message} />
+				) : (
+					<ErrorState description={result.error.message} />
+				)}
 			</WorkSurface>
 		)
 	}

@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge'
 import { buttonVariants } from '@/components/ui/button'
 import { DataTable, type TableColumn } from '@/components/ui/data-table'
 import { Pagination } from '@/components/ui/pagination'
-import { EmptyState, ErrorState } from '@/components/ui/state-panel'
+import { EmptyState, ErrorState, ForbiddenState } from '@/components/ui/state-panel'
 import type { AccessUser } from '@/lib/contracts/access-administration'
 import { formatBusinessDate } from '@/lib/format'
 import { getActor } from '@/server/auth/actor'
@@ -39,7 +39,13 @@ export default async function AccessPage({
 		pageSize: PAGE_SIZE
 	})
 
-	if (!result.ok) return <ErrorState description={result.error.message} />
+	if (!result.ok) {
+		return result.error.code === 'FORBIDDEN' ? (
+			<ForbiddenState description={result.error.message} />
+		) : (
+			<ErrorState description={result.error.message} />
+		)
+	}
 
 	const columns: readonly TableColumn<AccessUser>[] = [
 		{

@@ -9,7 +9,7 @@ import { Field, FieldRow } from '@/components/ui/field'
 import { TextInput } from '@/components/ui/inputs'
 import { Pagination } from '@/components/ui/pagination'
 import { SkeletonTable } from '@/components/ui/skeleton'
-import { EmptyState, ErrorState } from '@/components/ui/state-panel'
+import { EmptyState, ErrorState, ForbiddenState } from '@/components/ui/state-panel'
 import type { AuditEventDetail } from '@/lib/contracts/access-administration'
 import { formatBusinessDate } from '@/lib/format'
 import { getActor } from '@/server/auth/actor'
@@ -61,7 +61,13 @@ async function AuditTable({ params }: { params: AuditParams }) {
 		pageSize: PAGE_SIZE
 	})
 
-	if (!result.ok) return <ErrorState description={result.error.message} />
+	if (!result.ok) {
+		return result.error.code === 'FORBIDDEN' ? (
+			<ForbiddenState description={result.error.message} />
+		) : (
+			<ErrorState description={result.error.message} />
+		)
+	}
 
 	const columns: readonly TableColumn<AuditEventDetail>[] = [
 		{

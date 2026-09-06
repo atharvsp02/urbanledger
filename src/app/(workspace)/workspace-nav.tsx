@@ -2,6 +2,7 @@ import {
 	BookOpen,
 	FileText,
 	History,
+	LineChart,
 	LayoutDashboard,
 	NotebookPen,
 	Package,
@@ -14,6 +15,7 @@ import {
 	Tags,
 	Users,
 	Truck,
+	PiggyBank,
 	Wallet,
 	Warehouse
 } from 'lucide-react'
@@ -108,6 +110,46 @@ const NAV_DEFINITION: readonly NavDefinition[] = [
 				label: 'Trial balance',
 				icon: <Scale className="size-4" />,
 				href: '/reports/trial-balance',
+				capability: 'reports:read'
+			}
+		]
+	},
+	{
+		id: 'planning',
+		label: 'Planning',
+		items: [
+			{
+				id: 'budgets',
+				label: 'Budgets',
+				icon: <PiggyBank className="size-4" />,
+				href: '/budgets',
+				capability: 'masters:read'
+			}
+		]
+	},
+	{
+		id: 'reports',
+		label: 'Reports',
+		items: [
+			{
+				id: 'balance-sheet',
+				label: 'Balance sheet',
+				icon: <Scale className="size-4" />,
+				href: '/reports/balance-sheet',
+				capability: 'reports:read'
+			},
+			{
+				id: 'profit-loss',
+				label: 'Profit and loss',
+				icon: <LineChart className="size-4" />,
+				href: '/reports/profit-loss',
+				capability: 'reports:read'
+			},
+			{
+				id: 'budget-report',
+				label: 'Budget report',
+				icon: <PiggyBank className="size-4" />,
+				href: '/reports/budget',
 				capability: 'reports:read'
 			}
 		]

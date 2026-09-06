@@ -144,10 +144,7 @@ export default async function CustomerInvoicesPage({
 				/>
 			</ListToolbar>
 
-			<Suspense
-				key={`${params.state}|${params.page}`}
-				fallback={<SkeletonTable rows={6} columns={7} />}
-			>
+			<Suspense fallback={<SkeletonTable rows={6} columns={7} />}>
 				<InvoicesTable params={params} />
 			</Suspense>
 		</>

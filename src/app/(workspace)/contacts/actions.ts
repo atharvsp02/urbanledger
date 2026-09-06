@@ -5,13 +5,14 @@ import { redirect } from 'next/navigation'
 import type { ActionResult } from '@/lib/contracts/errors'
 import { contactInputSchema, type ContactKind } from '@/lib/masters/contact'
 import { contactAccessInputSchema } from '@/lib/masters/contact-access'
+import { toActionResult } from '@/server/actions/result'
+import { ApplicationError } from '@/server/errors/application-error'
 import { enableContactPortalAccess } from '@/server/masters/contact-access'
 import { removeContactImage, replaceContactImage } from '@/server/masters/contact-images'
 import { createContact, setContactArchived, updateContact } from '@/server/masters/contacts'
-import { toActionResult } from '@/server/actions/result'
 
 export type ContactActionState = ActionResult<{ id: string }> | null
-export type ContactImageState = ActionResult<{ id: string }> | null
+export type ContactImageState = ActionResult<{ id: string; imageUrl: string | null }> | null
 export type ContactAccessState = ActionResult<{ contactId: string; loginId: string }> | null
 
 function readContactInput(formData: FormData) {
@@ -75,15 +76,18 @@ export async function saveContactImageAction(
 
 	const result = await toActionResult(async () => {
 		if (intent === 'remove') {
-			return removeContactImage(contactId)
+			await removeContactImage(contactId)
+			return { id: contactId, imageUrl: null }
 		}
 
 		if (!(file instanceof File)) {
-			return { id: contactId }
+			throw new ApplicationError('VALIDATION_ERROR', 'Choose an image to upload.', {
+				image: ['Choose an image to upload.']
+			})
 		}
 
-		await replaceContactImage(contactId, file)
-		return { id: contactId }
+		const image = await replaceContactImage(contactId, file)
+		return { id: contactId, imageUrl: image.url }
 	})
 
 	if (result.ok) {

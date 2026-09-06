@@ -100,7 +100,7 @@ export default async function StockPage({ searchParams }: { searchParams: Promis
 				}
 			/>
 
-			<Suspense key={params.page} fallback={<SkeletonTable rows={6} columns={3} />}>
+			<Suspense fallback={<SkeletonTable rows={6} columns={3} />}>
 				<StockTable params={params} />
 			</Suspense>
 		</>

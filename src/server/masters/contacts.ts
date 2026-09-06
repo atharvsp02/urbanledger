@@ -14,6 +14,7 @@ import { contactProvisioningKey } from '@/server/masters/contact-access'
 import { getPrisma } from '@/server/db/prisma'
 import { ApplicationError } from '@/server/errors/application-error'
 import { recordMasterAudit } from '@/server/masters/audit'
+import { createContactImageUrls } from '@/server/masters/contact-images'
 import { resolvePage, type PageResult } from '@/server/masters/pagination'
 
 type ContactRow = Prisma.ContactModel & {
@@ -31,10 +32,11 @@ function portalStateOf(
 	return 'none'
 }
 
-function toSummary(contact: ContactRow): ContactSummary {
+function toSummary(contact: ContactRow, imageUrl: string | null = null): ContactSummary {
 	return {
 		id: contact.id,
 		name: contact.name,
+		imageUrl,
 		kind: contact.kind,
 		email: contact.email,
 		mobile: contact.mobile,
@@ -70,14 +72,26 @@ export async function listContacts(query: ContactListQuery): Promise<PageResult<
 	const { page, lastPage } = resolvePage(parsed.page, parsed.pageSize, totalCount)
 	const rows = await prisma.contact.findMany({
 		where,
-		include: { portalAccess: { select: { status: true } } },
+		include: {
+			portalAccess: { select: { status: true } },
+			imageAsset: { select: { storageKey: true } }
+		},
 		orderBy: [{ [parsed.sort]: parsed.direction }, { id: 'asc' }],
 		skip: (page - 1) * parsed.pageSize,
 		take: parsed.pageSize
 	})
 
+	const imageUrls = await createContactImageUrls(
+		rows.flatMap((contact) => (contact.imageAsset == null ? [] : [contact.imageAsset.storageKey]))
+	)
+
 	return {
-		rows: rows.map(toSummary),
+		rows: rows.map((contact) =>
+			toSummary(
+				contact,
+				contact.imageAsset == null ? null : (imageUrls.get(contact.imageAsset.storageKey) ?? null)
+			)
+		),
 		totalCount,
 		page,
 		pageSize: parsed.pageSize,

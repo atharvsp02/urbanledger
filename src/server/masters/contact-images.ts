@@ -1,6 +1,7 @@
 import 'server-only'
 import { randomUUID } from 'node:crypto'
-import { requireActor } from '@/server/auth/actor'
+import type { Actor, Capability } from '@/lib/contracts/access'
+import { getActor } from '@/server/auth/actor'
 import { createAdminSupabaseClient } from '@/server/auth/supabase'
 import { getServerEnvironment } from '@/server/config/environment'
 import { getPrisma } from '@/server/db/prisma'
@@ -18,6 +19,13 @@ function storageBucket() {
 	return getServerEnvironment().SUPABASE_STORAGE_BUCKET
 }
 
+function authorizeContactImage(actor: Actor, contactId: string, capability: Capability) {
+	const isOwnPortalProfile = actor.role === 'CONTACT' && actor.contactId === contactId
+	if (!isOwnPortalProfile && !actor.capabilities.includes(capability)) {
+		throw new ApplicationError('FORBIDDEN', 'You do not have permission to manage this photo.')
+	}
+}
+
 // Signed URLs are short-lived and minted per request; the bucket stays private
 // and the service key never leaves the server.
 export async function createContactImageUrl(storageKey: string) {
@@ -32,8 +40,26 @@ export async function createContactImageUrl(storageKey: string) {
 	return data.signedUrl
 }
 
+export async function createContactImageUrls(storageKeys: readonly string[]) {
+	if (storageKeys.length === 0) return new Map<string, string>()
+
+	const { data } = await createAdminSupabaseClient()
+		.storage.from(storageBucket())
+		.createSignedUrls([...storageKeys], SIGNED_URL_SECONDS)
+
+	return new Map(
+		(data ?? []).flatMap((image) =>
+			image.path != null && image.signedUrl != null ? [[image.path, image.signedUrl]] : []
+		)
+	)
+}
+
 export async function getContactImage(contactId: string) {
-	const actor = await requireActor('contacts:read')
+	return getContactImageForActor(await getActor(), contactId)
+}
+
+export async function getContactImageForActor(actor: Actor, contactId: string) {
+	authorizeContactImage(actor, contactId, 'contacts:read')
 	const contact = await getPrisma().contact.findFirst({
 		where: { id: contactId, businessId: actor.businessId },
 		select: { imageAsset: { select: { id: true, storageKey: true, mimeType: true } } }
@@ -48,7 +74,11 @@ export async function getContactImage(contactId: string) {
 }
 
 export async function replaceContactImage(contactId: string, file: File) {
-	const actor = await requireActor('contacts:update')
+	return replaceContactImageForActor(await getActor(), contactId, file)
+}
+
+export async function replaceContactImageForActor(actor: Actor, contactId: string, file: File) {
+	authorizeContactImage(actor, contactId, 'contacts:update')
 
 	if (file.size === 0) {
 		throw new ApplicationError('VALIDATION_ERROR', 'Choose an image to upload.', {
@@ -146,7 +176,11 @@ export async function replaceContactImage(contactId: string, file: File) {
 }
 
 export async function removeContactImage(contactId: string) {
-	const actor = await requireActor('contacts:update')
+	return removeContactImageForActor(await getActor(), contactId)
+}
+
+export async function removeContactImageForActor(actor: Actor, contactId: string) {
+	authorizeContactImage(actor, contactId, 'contacts:update')
 	const prisma = getPrisma()
 	const contact = await prisma.contact.findFirst({
 		where: { id: contactId, businessId: actor.businessId },

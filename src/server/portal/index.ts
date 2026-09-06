@@ -11,3 +11,5 @@ export {
 	listPortalPayments,
 	listPortalVendorBills
 } from '@/server/portal/queries'
+
+export { getPortalProfile, updatePortalProfile } from '@/server/portal/profile'

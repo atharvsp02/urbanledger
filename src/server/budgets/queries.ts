@@ -85,8 +85,21 @@ function toDetail(
 function toSummary(
 	budget: Prisma.BudgetGetPayload<{ include: typeof budgetInclude }>
 ): BudgetSummary {
-	const { lines: _lines, ...summary } = toDetail(budget)
-	return summary
+	return summaryFromDetail(toDetail(budget))
+}
+
+function summaryFromDetail(detail: BudgetDetail): BudgetSummary {
+	return {
+		id: detail.id,
+		name: detail.name,
+		startsOn: detail.startsOn,
+		endsOn: detail.endsOn,
+		responsible: detail.responsible,
+		plannedTotal: detail.plannedTotal,
+		lineCount: detail.lineCount,
+		revision: detail.revision,
+		archivedAt: detail.archivedAt
+	}
 }
 
 async function loadBudget(transaction: BudgetTransaction, businessId: string, budgetId: string) {
@@ -250,13 +263,16 @@ export async function getBudgetReport(
 				const actualTotal = sumJournalAmounts(
 					lines.map((line) => new Prisma.Decimal(line.actualAmount))
 				)
-				const { lines: _lines, ...summary } = budgetDetail
+				const varianceTotal = sumJournalAmounts(
+					lines.map((line) => new Prisma.Decimal(line.variance))
+				)
 				return {
-					budget: summary,
+					budget: summaryFromDetail(budgetDetail),
 					filter: { dateFrom, dateTo },
 					lines,
 					plannedTotal: budgetDetail.plannedTotal,
-					actualTotal: formatJournalAmount(actualTotal)
+					actualTotal: formatJournalAmount(actualTotal),
+					varianceTotal: formatJournalAmount(varianceTotal)
 				}
 			},
 			{ isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead }

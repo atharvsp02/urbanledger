@@ -4,7 +4,7 @@ import { PageHeader } from '@/components/app-shell/page-header'
 import { Badge } from '@/components/ui/badge'
 import { buttonVariants } from '@/components/ui/button'
 import { DataTable, type TableColumn } from '@/components/ui/data-table'
-import { ListToolbar, ToolbarFilter } from '@/components/ui/list-toolbar'
+import { ListToolbar, ToolbarFilter, ToolbarSort } from '@/components/ui/list-toolbar'
 import { EmptyState } from '@/components/ui/state-panel'
 import {
 	journalSortColumns,
@@ -110,23 +110,13 @@ export default async function JournalsPage({
 						{ value: 'include', label: 'Include archived' }
 					]}
 				/>
-				<ToolbarFilter
-					label="Sort by"
-					name="sort"
-					defaultValue={params.sort ?? 'code'}
+				<ToolbarSort
+					defaultSort={params.sort ?? 'code'}
+					defaultDirection={params.dir === 'desc' ? 'desc' : 'asc'}
 					options={journalSortColumns.map((value) => ({
 						value,
 						label: JOURNAL_SORT_LABELS[value]
 					}))}
-				/>
-				<ToolbarFilter
-					label="Order"
-					name="dir"
-					defaultValue={params.dir === 'desc' ? 'desc' : 'asc'}
-					options={[
-						{ value: 'asc', label: 'Ascending' },
-						{ value: 'desc', label: 'Descending' }
-					]}
 				/>
 			</ListToolbar>
 

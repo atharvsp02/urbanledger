@@ -131,6 +131,7 @@ export type BudgetReport = {
 	lines: BudgetReportLine[]
 	plannedTotal: string
 	actualTotal: string
+	varianceTotal: string
 }
 
 export { moneySchema as budgetMoneySchema }

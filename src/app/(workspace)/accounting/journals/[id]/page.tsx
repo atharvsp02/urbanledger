@@ -4,7 +4,7 @@ import { PageHeader, WorkSurface } from '@/components/app-shell/page-header'
 import { Badge } from '@/components/ui/badge'
 import { buttonVariants } from '@/components/ui/button'
 import { DataTable, type TableColumn } from '@/components/ui/data-table'
-import { fieldControlClassName } from '@/components/ui/field'
+import { ListToolbar, ToolbarDate } from '@/components/ui/list-toolbar'
 import { Pagination } from '@/components/ui/pagination'
 import { EmptyState, ErrorState, ForbiddenState } from '@/components/ui/state-panel'
 import { JOURNAL_ENTRY_SOURCE_LABELS, JOURNAL_ENTRY_STATUS_LABELS } from '@/lib/accounting/display'
@@ -215,42 +215,15 @@ export default async function JournalDetailPage({
 						</WorkSurface>
 					</div>
 
-					<form
-						method="get"
+					<ListToolbar
 						action={`/accounting/journals/${journal.id}`}
-						aria-label="Filter journal activity"
-						className="flex flex-col gap-3 rounded-xl border border-border bg-surface p-4 sm:flex-row sm:flex-wrap sm:items-end"
+						hasSearch={false}
+						searchLabel="Filter journal activity"
+						resetHref={`/accounting/journals/${journal.id}`}
 					>
-						<label className="flex flex-col gap-1.5 text-sm font-medium text-foreground">
-							From
-							<input
-								type="date"
-								name="from"
-								defaultValue={filters.from}
-								className={fieldControlClassName}
-							/>
-						</label>
-						<label className="flex flex-col gap-1.5 text-sm font-medium text-foreground">
-							To
-							<input
-								type="date"
-								name="to"
-								defaultValue={filters.to}
-								className={fieldControlClassName}
-							/>
-						</label>
-						<div className="flex flex-wrap gap-2">
-							<button type="submit" className={buttonVariants({ size: 'sm' })}>
-								Apply
-							</button>
-							<Link
-								href={`/accounting/journals/${journal.id}`}
-								className={buttonVariants({ variant: 'secondary', size: 'sm' })}
-							>
-								Clear
-							</Link>
-						</div>
-					</form>
+						<ToolbarDate label="From" name="from" defaultValue={filters.from} />
+						<ToolbarDate label="To" name="to" defaultValue={filters.to} />
+					</ListToolbar>
 
 					<WorkSurface title="Posted entry activity" isFlush>
 						<div className="rounded-xl bg-surface">

@@ -7,6 +7,7 @@ import type {
 	PaymentSummary
 } from '@/lib/contracts/payment'
 import { formatAmount, formatBusinessDate } from '@/lib/format'
+import { isPositiveMoney } from '@/lib/money'
 import {
 	PaymentDirectionBadge,
 	PaymentStatusBadge,
@@ -32,7 +33,7 @@ export function SettlementPanel({
 	canRecordPayment: boolean
 }) {
 	const { settlement, payments } = history
-	const isOverdue = Number(settlement.overdueAmount) > 0
+	const isOverdue = isPositiveMoney(settlement.overdueAmount)
 
 	const columns: readonly TableColumn<PaymentSummary>[] = [
 		{

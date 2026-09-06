@@ -1,4 +1,5 @@
 import { formatAmount, formatBusinessDate } from '@/lib/format'
+import { addMoney, subtractMoney } from '@/lib/money'
 import { getActor } from '@/server/auth/actor'
 import { pdfResponse, renderDocumentPdf } from '@/server/documents/pdf'
 import { getPaymentReceiptData } from '@/server/portal'
@@ -36,8 +37,9 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
 
 		const receipt = result.data
 		const applied = receipt.allocations.reduce(
-			(sum, allocation) => sum + Number(allocation.amount) - Number(allocation.reversedAmount),
-			0
+			(sum, allocation) =>
+				addMoney(sum, subtractMoney(allocation.amount, allocation.reversedAmount)),
+			'0.00'
 		)
 
 		const bytes = await renderDocumentPdf({
@@ -71,7 +73,7 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
 					value: formatAmount(receipt.amount, { currencySymbol: '' }),
 					emphasis: true
 				},
-				{ label: 'Net applied', value: formatAmount(applied.toFixed(2), { currencySymbol: '' }) }
+				{ label: 'Net applied', value: formatAmount(applied, { currencySymbol: '' }) }
 			],
 			notes: [
 				receipt.status === 'REVERSED'

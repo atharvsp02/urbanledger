@@ -4,6 +4,7 @@ import { Field, FieldRow } from '@/components/ui/field'
 import { TextInput } from '@/components/ui/inputs'
 import { ErrorState } from '@/components/ui/state-panel'
 import { formatAmount, formatBusinessDate } from '@/lib/format'
+import { isNegativeMoney } from '@/lib/money'
 import { getActor } from '@/server/auth/actor'
 import { getBusinessToday } from '@/server/business/today'
 import { getProfitAndLoss } from '@/server/reports'
@@ -101,7 +102,7 @@ export default async function ProfitAndLossPage({
 							</div>
 							<div className="flex items-baseline justify-between gap-4 border-t border-border pt-2">
 								<dt className="font-semibold">
-									{Number(result.data.profit) < 0 ? 'Net loss' : 'Net profit'}
+									{isNegativeMoney(result.data.profit) ? 'Net loss' : 'Net profit'}
 								</dt>
 								<dd className="text-lg font-semibold tabular-nums">
 									{formatAmount(result.data.profit)}

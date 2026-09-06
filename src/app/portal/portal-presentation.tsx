@@ -1,5 +1,6 @@
 import { Badge, type BadgeTone } from '@/components/ui/badge'
 import type { PortalSettlementStatus } from '@/lib/contracts/portal'
+import { isPositiveMoney } from '@/lib/money'
 
 const SETTLEMENT: Record<PortalSettlementStatus, { label: string; tone: BadgeTone }> = {
 	UNPAID: { label: 'Unpaid', tone: 'accent' },
@@ -16,7 +17,7 @@ export function PortalStatusBadge({
 	overdueAmount: string
 }) {
 	const presentation = SETTLEMENT[status]
-	const isOverdue = Number(overdueAmount) > 0 && status !== 'PAID' && status !== 'REVERSED'
+	const isOverdue = isPositiveMoney(overdueAmount) && status !== 'PAID' && status !== 'REVERSED'
 
 	return (
 		<span className="inline-flex flex-wrap items-center gap-2">

@@ -27,6 +27,10 @@ export function subtractMoney(minuend: string, subtrahend: string): string {
 	return fromMinorUnits(toMinorUnits(minuend) - toMinorUnits(subtrahend))
 }
 
+export function addMoney(...values: readonly string[]): string {
+	return fromMinorUnits(values.reduce((sum, value) => sum + toMinorUnits(value), BigInt(0)))
+}
+
 export function isPositiveMoney(value: string): boolean {
 	return toMinorUnits(value) > BigInt(0)
 }

@@ -9,6 +9,7 @@ import { AmountInput, SelectInput, TextInput } from '@/components/ui/inputs'
 import type { PaymentOptions } from '@/lib/contracts/payment'
 import type { PortalDocumentDetail } from '@/lib/contracts/portal'
 import { formatAmount, formatBusinessDate, trimMoneyScale } from '@/lib/format'
+import { isNegativeMoney, normalizeMoney, subtractMoney } from '@/lib/money'
 import {
 	finalizePortalPaymentAction,
 	readPortalAttemptStatusAction,
@@ -97,10 +98,8 @@ export function PortalPayPanel({
 			const journal = options.liquidityJournals.find((entry) => entry.id === journalId)
 			const paymentId = finalized.data.paymentId
 			const receipt = paymentId == null ? null : await readPortalPaymentAction(paymentId)
-			const committedAmount = receipt?.ok === true ? receipt.data.amount : Number(amount).toFixed(2)
-			const remaining = (
-				Math.round((Number(document.outstandingAmount) - Number(committedAmount)) * 100) / 100
-			).toFixed(2)
+			const committedAmount = receipt?.ok === true ? receipt.data.amount : normalizeMoney(amount)
+			const remaining = subtractMoney(document.outstandingAmount, committedAmount)
 
 			setPhase({
 				name: 'committed',
@@ -111,7 +110,7 @@ export function PortalPayPanel({
 					amount: committedAmount,
 					paymentDate: receipt?.ok === true ? receipt.data.paymentDate : paymentDate,
 					journalName: journal == null ? 'Selected method' : `${journal.code} ${journal.name}`,
-					remaining: remaining.startsWith('-') ? '0.00' : remaining
+					remaining: isNegativeMoney(remaining) ? '0.00' : remaining
 				}
 			})
 		})

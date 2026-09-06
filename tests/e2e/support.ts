@@ -160,20 +160,23 @@ export async function deletePortalIdentity(loginId: string) {
 
 // A server action reached directly, without the page that renders it: the
 // hidden React fields carry the action identity, and everything else is
-// ordinary form data.
+// ordinary form data. React names those fields with a leading "$" and encodes
+// the identity in the name itself, so every one of them has to be forwarded.
 export async function readServerActionFields(page: Page, pageUrl: string) {
 	await page.goto(pageUrl)
-	const actionFields: Record<string, string> = {}
+	const actionFields = await page
+		.locator('input[name^="$"]')
+		.evaluateAll((inputs) =>
+			Object.fromEntries(
+				inputs.map((input) => [(input as HTMLInputElement).name, (input as HTMLInputElement).value])
+			)
+		)
 
-	for (const name of ['$ACTION_REF_1', '$ACTION_1:0', '$ACTION_1:1', '$ACTION_KEY']) {
-		const locator = page.locator(`input[name="${name}"]`).first()
-
-		if ((await locator.count()) > 0) {
-			actionFields[name] = await locator.inputValue()
-		}
+	if (Object.keys(actionFields).length === 0) {
+		throw new Error(`No server action fields were rendered on ${pageUrl}.`)
 	}
 
-	return actionFields
+	return actionFields as Record<string, string>
 }
 
 const PNG_PIXEL =

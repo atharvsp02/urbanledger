@@ -1,5 +1,6 @@
 import {
 	BookOpen,
+	Building2,
 	FileText,
 	History,
 	LineChart,
@@ -10,6 +11,7 @@ import {
 	Percent,
 	ReceiptText,
 	Scale,
+	ScrollText,
 	ShoppingBag,
 	ShoppingCart,
 	Tags,
@@ -17,7 +19,8 @@ import {
 	Truck,
 	PiggyBank,
 	Wallet,
-	Warehouse
+	Warehouse,
+	Wrench
 } from 'lucide-react'
 import type { Actor, Capability } from '@/lib/contracts/access'
 import type { ShellNavGroup } from '@/components/app-shell/types'
@@ -218,6 +221,40 @@ const NAV_DEFINITION: readonly NavDefinition[] = [
 				icon: <Wallet className="size-4" />,
 				href: '/payments',
 				capability: 'transactions:read'
+			}
+		]
+	},
+	{
+		id: 'administration',
+		label: 'Administration',
+		items: [
+			{
+				id: 'setup',
+				label: 'Setup',
+				icon: <Wrench className="size-4" />,
+				href: '/setup',
+				capability: 'business:manage'
+			},
+			{
+				id: 'company',
+				label: 'Company',
+				icon: <Building2 className="size-4" />,
+				href: '/settings/company',
+				capability: 'transactions:read'
+			},
+			{
+				id: 'access',
+				label: 'Access',
+				icon: <Users className="size-4" />,
+				href: '/settings/access',
+				capability: 'access:manage'
+			},
+			{
+				id: 'audit',
+				label: 'Audit',
+				icon: <ScrollText className="size-4" />,
+				href: '/settings/audit',
+				capability: 'audit:read'
 			}
 		]
 	},

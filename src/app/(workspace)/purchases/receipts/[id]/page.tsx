@@ -58,13 +58,22 @@ export default async function PurchaseReceiptDetailPage({
 				line.inventoryMovementId == null ? (
 					<span className="text-muted-foreground">None</span>
 				) : (
-					'Recorded'
+					<Link href="/stock/movements" className="text-accent hover:underline">
+						Recorded
+					</Link>
 				)
 		}
 	]
 
 	const details: readonly { label: string; value: React.ReactNode }[] = [
-		{ label: 'Vendor', value: receipt.vendor.name },
+		{
+			label: 'Vendor',
+			value: (
+				<Link href={`/contacts/${receipt.vendor.id}`} className="text-accent hover:underline">
+					{receipt.vendor.name}
+				</Link>
+			)
+		},
 		{ label: 'Receipt date', value: formatBusinessDate(receipt.receiptDate) },
 		{ label: 'Recorded by', value: receipt.createdBy.displayName },
 		{

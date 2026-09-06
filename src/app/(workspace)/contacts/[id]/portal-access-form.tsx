@@ -41,6 +41,7 @@ export function PortalAccessForm({
 			<FormErrorSummary
 				errors={fieldErrorEntries(state, 'access', FIELD_LABELS)}
 				description={state?.ok === false ? state.error.message : undefined}
+				code={state?.ok === false ? state.error.code : undefined}
 			/>
 
 			<FieldRow>

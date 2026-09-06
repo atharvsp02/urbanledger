@@ -83,6 +83,7 @@ async function documentSummary(
 		externalReference: string | null
 		contactId: string
 		contactNameSnapshot: string
+		revision: number
 		netTotal: Prisma.Decimal
 		taxTotal: Prisma.Decimal
 		total: Prisma.Decimal
@@ -104,6 +105,7 @@ async function documentSummary(
 		dueDate: dateOnly(document.dueDate),
 		reference: document.externalReference,
 		contact: { id: document.contactId, name: document.contactNameSnapshot },
+		revision: document.revision,
 		netTotal: formatJournalAmount(document.netTotal),
 		taxTotal: formatJournalAmount(document.taxTotal),
 		total: formatJournalAmount(document.total),
@@ -242,6 +244,7 @@ function paymentSummary(payment: {
 	number: string
 	direction: 'CUSTOMER_INCOMING' | 'VENDOR_OUTGOING'
 	status: 'POSTED' | 'REVERSED'
+	sourceMode: 'STAFF' | 'PORTAL_SIMULATION'
 	paymentDate: Date
 	amount: Prisma.Decimal
 	externalReference: string | null
@@ -254,6 +257,7 @@ function paymentSummary(payment: {
 		number: payment.number,
 		direction: payment.direction,
 		status: payment.status,
+		sourceMode: payment.sourceMode,
 		paymentDate: dateOnly(payment.paymentDate),
 		amount: formatJournalAmount(payment.amount),
 		reference: payment.externalReference,

@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import type { Role } from '@/lib/contracts/access'
 import { buttonVariants } from '@/components/ui/button'
 
@@ -32,6 +33,12 @@ export function AccountBlock({
 					<span className="block text-xs text-muted-foreground">{ROLE_LABELS[role]}</span>
 				</span>
 			</div>
+			<Link
+				href="/change-password"
+				className={buttonVariants({ variant: 'ghost', size: 'sm', className: 'w-full' })}
+			>
+				Change password
+			</Link>
 			<form action={signOutAction}>
 				<button
 					type="submit"

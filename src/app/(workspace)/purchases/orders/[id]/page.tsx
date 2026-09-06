@@ -5,7 +5,9 @@ import { buttonVariants } from '@/components/ui/button'
 import { DataTable, type TableColumn } from '@/components/ui/data-table'
 import { ErrorState } from '@/components/ui/state-panel'
 import type { PurchaseOrderLine } from '@/lib/contracts/purchase-order'
+import { Badge } from '@/components/ui/badge'
 import { formatAmount, formatBusinessDate, formatQuantity, trimMoneyScale } from '@/lib/format'
+import { PRODUCT_KIND_LABELS } from '@/lib/masters/product'
 import { getActor } from '@/server/auth/actor'
 import { getPurchaseOrder } from '@/server/purchasing'
 import { OrderStateBadge } from '@/app/(workspace)/purchases/orders/order-state-badge'
@@ -33,10 +35,19 @@ export default async function PurchaseOrderDetailPage({
 	const isDraft = order.state === 'DRAFT'
 	const canTransact = actor.capabilities.includes('transactions:create')
 	const isConfirmed = order.state === 'CONFIRMED'
-	const hasGoodsLines = order.lines.length > 0
+	const hasGoodsLines = order.lines.some((line) => line.productKind !== 'SERVICE')
 
 	const columns: readonly TableColumn<PurchaseOrderLine>[] = [
 		{ id: 'product', header: 'Product', cell: (line) => line.productName },
+		{
+			id: 'kind',
+			header: 'Type',
+			cell: (line) => (
+				<Badge tone={line.productKind === 'SERVICE' ? 'neutral' : 'accent'}>
+					{PRODUCT_KIND_LABELS[line.productKind]}
+				</Badge>
+			)
+		},
 		{
 			id: 'quantity',
 			header: 'Quantity',
@@ -49,16 +60,50 @@ export default async function PurchaseOrderDetailPage({
 			isNumeric: true,
 			cell: (line) => formatAmount(trimMoneyScale(line.unitPrice))
 		},
+		{ id: 'net', header: 'Net', isNumeric: true, cell: (line) => formatAmount(line.lineNetTotal) },
+		{
+			id: 'tax',
+			header: 'Tax',
+			cell: (line) =>
+				line.tax == null ? (
+					<span className="text-muted-foreground">None</span>
+				) : (
+					`${line.tax.name} (${trimMoneyScale(line.tax.rate, 0)}%)`
+				)
+		},
+		{
+			id: 'taxAmount',
+			header: 'Tax amount',
+			isNumeric: true,
+			cell: (line) => formatAmount(line.taxAmount)
+		},
+		{
+			id: 'analytic',
+			header: 'Analytic',
+			cell: (line) =>
+				line.analyticAccount == null ? (
+					<span className="text-muted-foreground">None</span>
+				) : (
+					line.analyticAccount.name
+				)
+		},
 		{
 			id: 'lineTotal',
-			header: 'Line total',
+			header: 'Gross',
 			isNumeric: true,
 			cell: (line) => formatAmount(line.lineTotal)
 		}
 	]
 
-	const details: readonly { label: string; value: string }[] = [
-		{ label: 'Vendor', value: order.vendor.name },
+	const details: readonly { label: string; value: React.ReactNode }[] = [
+		{
+			label: 'Vendor',
+			value: (
+				<Link href={`/contacts/${order.vendor.id}`} className="text-accent hover:underline">
+					{order.vendor.name}
+				</Link>
+			)
+		},
 		{ label: 'Order date', value: formatBusinessDate(order.orderDate) },
 		{ label: 'Created by', value: order.createdBy.displayName },
 		{ label: 'Revision', value: String(order.revision) }
@@ -115,11 +160,21 @@ export default async function PurchaseOrderDetailPage({
 					</dl>
 				</WorkSurface>
 
-				<WorkSurface title="Total">
-					<p className="text-2xl font-semibold tabular-nums">{formatAmount(order.total)}</p>
-					<p className="mt-1 text-sm text-muted-foreground">
-						Calculated and stored by the server from the saved lines.
-					</p>
+				<WorkSurface title="Totals">
+					<dl className="flex flex-col gap-2 text-sm">
+						<div className="flex items-baseline justify-between gap-4">
+							<dt className="text-muted-foreground">Net</dt>
+							<dd className="tabular-nums">{formatAmount(order.netTotal)}</dd>
+						</div>
+						<div className="flex items-baseline justify-between gap-4">
+							<dt className="text-muted-foreground">Tax</dt>
+							<dd className="tabular-nums">{formatAmount(order.taxTotal)}</dd>
+						</div>
+						<div className="flex items-baseline justify-between gap-4 border-t border-border pt-2">
+							<dt className="font-semibold">Gross</dt>
+							<dd className="text-lg font-semibold tabular-nums">{formatAmount(order.total)}</dd>
+						</div>
+					</dl>
 				</WorkSurface>
 			</div>
 

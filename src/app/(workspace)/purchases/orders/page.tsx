@@ -66,12 +66,8 @@ async function PurchaseOrdersTable({ params }: { params: OrderParams }) {
 			header: 'Status',
 			cell: (order) => <OrderStateBadge state={order.state} />
 		},
-		{
-			id: 'total',
-			header: 'Total',
-			isNumeric: true,
-			cell: (order) => formatAmount(order.total)
-		}
+		{ id: 'net', header: 'Net', isNumeric: true, cell: (order) => formatAmount(order.netTotal) },
+		{ id: 'total', header: 'Gross', isNumeric: true, cell: (order) => formatAmount(order.total) }
 	]
 
 	return (

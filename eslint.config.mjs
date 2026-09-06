@@ -16,5 +16,17 @@ export default defineConfig([
 		'docs/**',
 		'src/generated/prisma/**',
 		'next-env.d.ts'
-	])
+	]),
+	{
+		rules: {
+			'@typescript-eslint/no-unused-vars': [
+				'warn',
+				{
+					argsIgnorePattern: '^_',
+					varsIgnorePattern: '^_',
+					caughtErrorsIgnorePattern: '^_'
+				}
+			]
+		}
+	}
 ])

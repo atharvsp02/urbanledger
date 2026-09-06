@@ -7,6 +7,10 @@ import { ErrorState } from '@/components/ui/state-panel'
 import type { CustomerInvoiceDetail } from '@/lib/contracts/customer-invoice'
 import { formatAmount, formatBusinessDate, formatQuantity, trimMoneyScale } from '@/lib/format'
 import { getActor } from '@/server/auth/actor'
+import { getBusinessToday } from '@/server/business/today'
+import { getDocumentPaymentHistory, getPaymentOptions } from '@/server/payments'
+import { SettlementPanel } from '@/app/(workspace)/payments/settlement-panel'
+import { DocumentReversalControl } from '@/app/(workspace)/payments/document-reversal-control'
 import { getCustomerInvoice, getCustomerInvoiceOptions } from '@/server/sales'
 import { InvoiceStateBadge } from '@/app/(workspace)/sales/invoices/invoice-state-badge'
 import { DraftInvoiceControls } from '@/app/(workspace)/sales/invoices/[id]/invoice-controls'
@@ -31,6 +35,15 @@ export default async function CustomerInvoiceDetailPage({
 	const isDraft = invoice.state === 'DRAFT'
 	const canTransact = actor.capabilities.includes('transactions:create')
 	const options = isDraft && canTransact ? await getCustomerInvoiceOptions(actor) : null
+	const isPosted = invoice.state === 'POSTED'
+	const canPay = actor.capabilities.includes('payments:record')
+	const canReverse = actor.capabilities.includes('transactions:reverse')
+	const history = isPosted
+		? await getDocumentPaymentHistory(actor, { documentId: invoice.id })
+		: null
+	const paymentOptions =
+		isPosted && canPay ? await getPaymentOptions(actor, { documentId: invoice.id }) : null
+	const today = isPosted ? await getBusinessToday(actor) : invoice.invoiceDate
 
 	const columns: readonly TableColumn<InvoiceLine>[] = [
 		{ id: 'product', header: 'Product', cell: (line) => line.productName },
@@ -117,14 +130,24 @@ export default async function CustomerInvoiceDetailPage({
 					{ label: invoice.invoiceNumber }
 				]}
 				action={
-					isDraft && canTransact ? (
-						<Link
-							href={`/sales/invoices/${invoice.id}/edit`}
-							className={buttonVariants({ variant: 'secondary', size: 'sm' })}
-						>
-							Edit
-						</Link>
-					) : null
+					<>
+						{isDraft && canTransact && (
+							<Link
+								href={`/sales/invoices/${invoice.id}/edit`}
+								className={buttonVariants({ variant: 'secondary', size: 'sm' })}
+							>
+								Edit
+							</Link>
+						)}
+						{invoice.state === 'POSTED' && (
+							<a
+								href={`/api/invoices/${invoice.id}/pdf`}
+								className={buttonVariants({ variant: 'secondary', size: 'sm' })}
+							>
+								Download PDF
+							</a>
+						)}
+					</>
 				}
 			/>
 
@@ -163,6 +186,18 @@ export default async function CustomerInvoiceDetailPage({
 				</WorkSurface>
 			)}
 
+			{isPosted && history?.ok === true && (
+				<SettlementPanel
+					history={history.data}
+					options={paymentOptions?.ok === true ? paymentOptions.data : null}
+					direction="CUSTOMER_INCOMING"
+					documentRevision={invoice.revision}
+					documentPath={`/sales/invoices/${invoice.id}`}
+					today={today}
+					canRecordPayment={canPay}
+				/>
+			)}
+
 			<div className="grid gap-4 lg:grid-cols-[1.6fr_1fr]">
 				<WorkSurface title="Invoice">
 					<dl className="grid gap-x-6 gap-y-3 sm:grid-cols-2">
@@ -194,6 +229,21 @@ export default async function CustomerInvoiceDetailPage({
 					</dl>
 				</WorkSurface>
 			</div>
+
+			{isPosted && canReverse && (
+				<WorkSurface
+					title="Reverse this invoice"
+					description="Reverse live payments first. Reversal appends an opposite entry at an allowed date."
+				>
+					<DocumentReversalControl
+						documentId={invoice.id}
+						documentKind="CUSTOMER_INVOICE"
+						documentPath={`/sales/invoices/${invoice.id}`}
+						revision={invoice.revision}
+						today={today}
+					/>
+				</WorkSurface>
+			)}
 
 			<div className="rounded-xl border border-border bg-surface">
 				<DataTable

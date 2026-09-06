@@ -1,7 +1,9 @@
 'use client'
 
 import { useEffect, useRef } from 'react'
+import { useRouter } from 'next/navigation'
 import { AlertCircle } from 'lucide-react'
+import { buttonVariants } from '@/components/ui/button'
 
 export type FieldErrorEntry = { fieldId: string; label: string; message: string }
 
@@ -9,13 +11,17 @@ export type FieldErrorEntry = { fieldId: string; label: string; message: string 
 export function FormErrorSummary({
 	title = 'This form could not be submitted',
 	description,
+	code,
 	errors
 }: {
 	title?: string
 	description?: string
+	code?: string
 	errors: readonly FieldErrorEntry[]
 }) {
+	const router = useRouter()
 	const headingRef = useRef<HTMLParagraphElement>(null)
+	const isStale = code === 'STALE_REVISION'
 	// A rejection without field errors, such as a stale revision, still has to
 	// reach the reader.
 	const isVisible = errors.length > 0 || description != null
@@ -38,10 +44,19 @@ export function FormErrorSummary({
 				className="flex items-start gap-2 text-sm font-semibold text-danger outline-none"
 			>
 				<AlertCircle aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
-				<span>{title}</span>
+				<span>{isStale ? 'This record changed while you were editing' : title}</span>
 			</p>
 			{description != null && (
 				<p className="mt-2 text-sm leading-relaxed text-muted-foreground">{description}</p>
+			)}
+			{isStale && (
+				<button
+					type="button"
+					onClick={() => router.refresh()}
+					className={buttonVariants({ variant: 'secondary', size: 'sm', className: 'mt-3' })}
+				>
+					Reload the current values
+				</button>
 			)}
 			{errors.length > 0 && (
 				<ul className="mt-3 flex list-none flex-col gap-1.5 p-0">

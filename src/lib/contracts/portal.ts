@@ -33,6 +33,7 @@ export type PortalDocumentSummary = {
 	dueDate: string
 	reference: string | null
 	contact: { id: string; name: string }
+	revision: number
 	netTotal: string
 	taxTotal: string
 	total: string
@@ -73,6 +74,7 @@ export type PortalPaymentSummary = {
 	number: string
 	direction: 'CUSTOMER_INCOMING' | 'VENDOR_OUTGOING'
 	status: 'POSTED' | 'REVERSED'
+	sourceMode: 'STAFF' | 'PORTAL_SIMULATION'
 	paymentDate: string
 	amount: string
 	reference: string | null

@@ -42,13 +42,18 @@ export function ReceiptControl({
 			<FormErrorSummary
 				errors={fieldErrorEntries(state, 'receipt', RECEIPT_LABELS)}
 				description={state?.ok === false ? state.error.message : undefined}
+				code={state?.ok === false ? state.error.code : undefined}
 			/>
 
 			<FieldRow className="sm:grid-cols-[16rem_auto] sm:items-end">
 				<Field
 					id="receipt-receiptDate"
 					label={RECEIPT_LABELS.receiptDate}
-					hint={`Cannot be before the order date, ${orderDate}.`}
+					hint={
+						hasGoodsLines
+							? 'Goods and Combo lines increase quantity on hand.'
+							: 'Service lines record acceptance without a stock movement.'
+					}
 					error={firstFieldError(state, 'receiptDate')}
 					isRequired
 					inRow
@@ -98,6 +103,7 @@ export function VendorBillControl({
 			<FormErrorSummary
 				errors={fieldErrorEntries(state, 'bill', BILL_LABELS)}
 				description={state?.ok === false ? state.error.message : undefined}
+				code={state?.ok === false ? state.error.code : undefined}
 			/>
 
 			<FieldRow className="sm:grid-cols-3">

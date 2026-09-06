@@ -134,6 +134,9 @@ test.describe('master data', () => {
 		await page.locator('input[name="image"]').setInputFiles(pngFixture())
 		const image = page.getByRole('img', { name: `${contactName} profile image` })
 		await expect(image).toBeVisible()
+		// The upload shows a local preview while it runs, so the stored asset is
+		// only readable once the server confirms the replacement.
+		await expect(page.getByText('Photo updated.')).toBeVisible()
 
 		const storedAsset = await withDatabase((client) =>
 			client.query<{ storageKey: string; mimeType: string; width: number }>(

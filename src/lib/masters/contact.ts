@@ -72,6 +72,7 @@ export type ContactPortalState = 'none' | 'pending' | 'active' | 'failed' | 'rev
 export type ContactSummary = {
 	id: string
 	name: string
+	imageUrl: string | null
 	kind: ContactKind
 	email: string | null
 	mobile: string | null

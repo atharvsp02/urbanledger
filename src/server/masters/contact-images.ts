@@ -40,6 +40,20 @@ export async function createContactImageUrl(storageKey: string) {
 	return data.signedUrl
 }
 
+export async function createContactImageUrls(storageKeys: readonly string[]) {
+	if (storageKeys.length === 0) return new Map<string, string>()
+
+	const { data } = await createAdminSupabaseClient()
+		.storage.from(storageBucket())
+		.createSignedUrls([...storageKeys], SIGNED_URL_SECONDS)
+
+	return new Map(
+		(data ?? []).flatMap((image) =>
+			image.path != null && image.signedUrl != null ? [[image.path, image.signedUrl]] : []
+		)
+	)
+}
+
 export async function getContactImage(contactId: string) {
 	return getContactImageForActor(await getActor(), contactId)
 }

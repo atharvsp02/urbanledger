@@ -60,7 +60,11 @@ async function ContactsTable({ params }: { params: ContactParams }) {
 			header: 'Name',
 			cell: (contact) => (
 				<span className="flex items-center gap-3">
-					<ContactAvatar name={contact.name} className="size-8" />
+					<ContactAvatar
+						name={contact.name}
+						imageUrl={contact.imageUrl ?? undefined}
+						className="size-8"
+					/>
 					<span className="min-w-0">
 						<span className="block font-medium">{contact.name}</span>
 						<span className="block text-xs text-muted-foreground">{contact.email ?? '-'}</span>

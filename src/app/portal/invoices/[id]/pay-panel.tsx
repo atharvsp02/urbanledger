@@ -86,8 +86,7 @@ export function PortalPayPanel({
 				attemptId: current.id,
 				expectedRevision: current.revision,
 				journalId,
-				outcome: 'SUCCEEDED',
-				documentId: document.id
+				outcome: 'SUCCEEDED'
 			})
 
 			if (!finalized.ok) {

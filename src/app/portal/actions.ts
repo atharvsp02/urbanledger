@@ -1,6 +1,5 @@
 'use server'
 
-import { revalidatePath } from 'next/cache'
 import type { ActionResult } from '@/lib/contracts/errors'
 import type { PaymentAttemptDetail } from '@/lib/contracts/payment'
 import type { PortalPaymentDetail } from '@/lib/contracts/portal'
@@ -32,18 +31,12 @@ export async function finalizePortalPaymentAction(input: {
 	expectedRevision: number
 	journalId?: string
 	outcome: 'SUCCEEDED' | 'FAILED'
-	documentId: string
 }): Promise<ActionResult<PaymentAttemptDetail>> {
 	const actor = await getActor()
-	const { documentId, ...attemptInput } = input
-	const result = await finalizePortalPaymentAttempt(actor, attemptInput)
-
-	if (result.ok) {
-		revalidatePath('/portal')
-		revalidatePath(`/portal/invoices/${documentId}`)
-	}
-
-	return result
+	// Revalidating here would re-render the invoice page as settled and take the
+	// receipt away with the pay panel. Both portal pages are dynamic, so the next
+	// navigation already reads the committed state.
+	return finalizePortalPaymentAttempt(actor, input)
 }
 
 export async function cancelPortalPaymentAction(input: {

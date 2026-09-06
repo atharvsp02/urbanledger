@@ -98,7 +98,14 @@ export default async function VendorBillDetailPage({
 	]
 
 	const details: readonly { label: string; value: React.ReactNode }[] = [
-		{ label: 'Vendor', value: bill.vendor.name },
+		{
+			label: 'Vendor',
+			value: (
+				<Link href={`/contacts/${bill.vendor.id}`} className="text-accent hover:underline">
+					{bill.vendor.name}
+				</Link>
+			)
+		},
 		{
 			label: 'Purchase order',
 			value: (

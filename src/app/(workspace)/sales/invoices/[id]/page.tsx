@@ -130,14 +130,24 @@ export default async function CustomerInvoiceDetailPage({
 					{ label: invoice.invoiceNumber }
 				]}
 				action={
-					isDraft && canTransact ? (
-						<Link
-							href={`/sales/invoices/${invoice.id}/edit`}
-							className={buttonVariants({ variant: 'secondary', size: 'sm' })}
-						>
-							Edit
-						</Link>
-					) : null
+					<>
+						{isDraft && canTransact && (
+							<Link
+								href={`/sales/invoices/${invoice.id}/edit`}
+								className={buttonVariants({ variant: 'secondary', size: 'sm' })}
+							>
+								Edit
+							</Link>
+						)}
+						{invoice.state === 'POSTED' && (
+							<a
+								href={`/api/invoices/${invoice.id}/pdf`}
+								className={buttonVariants({ variant: 'secondary', size: 'sm' })}
+							>
+								Download PDF
+							</a>
+						)}
+					</>
 				}
 			/>
 

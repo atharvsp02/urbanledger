@@ -95,8 +95,15 @@ export default async function PurchaseOrderDetailPage({
 		}
 	]
 
-	const details: readonly { label: string; value: string }[] = [
-		{ label: 'Vendor', value: order.vendor.name },
+	const details: readonly { label: string; value: React.ReactNode }[] = [
+		{
+			label: 'Vendor',
+			value: (
+				<Link href={`/contacts/${order.vendor.id}`} className="text-accent hover:underline">
+					{order.vendor.name}
+				</Link>
+			)
+		},
 		{ label: 'Order date', value: formatBusinessDate(order.orderDate) },
 		{ label: 'Created by', value: order.createdBy.displayName },
 		{ label: 'Revision', value: String(order.revision) }

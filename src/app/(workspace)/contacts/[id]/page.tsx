@@ -1,10 +1,10 @@
+import { Suspense } from 'react'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { FileText } from 'lucide-react'
 import { PageHeader, WorkSurface } from '@/components/app-shell/page-header'
 import { Badge } from '@/components/ui/badge'
 import { buttonVariants } from '@/components/ui/button'
-import { EmptyState } from '@/components/ui/state-panel'
+import { SkeletonTable } from '@/components/ui/skeleton'
 import { CONTACT_KIND_LABELS } from '@/lib/masters/contact'
 import { formatBusinessDate } from '@/lib/format'
 import { getActor } from '@/server/auth/actor'
@@ -12,6 +12,7 @@ import { getContactImage } from '@/server/masters/contact-images'
 import { getContactDetail } from '@/server/masters/contacts'
 import { ApplicationError } from '@/server/errors/application-error'
 import { ArchiveControl } from '@/app/(workspace)/contacts/[id]/archive-control'
+import { ContactDocuments } from '@/app/(workspace)/contacts/[id]/contact-documents'
 import { ContactImage } from '@/app/(workspace)/contacts/[id]/contact-image'
 import { PortalAccessForm } from '@/app/(workspace)/contacts/[id]/portal-access-form'
 import { PortalStateBadge } from '@/app/(workspace)/contacts/portal-state-badge'
@@ -144,13 +145,9 @@ export default async function ContactDetailPage({ params }: { params: Promise<{ 
 				)}
 			</WorkSurface>
 
-			<WorkSurface title="Related documents">
-				<EmptyState
-					icon={FileText}
-					title="No documents yet"
-					description="Sales orders, invoices, bills and payments for this contact appear here once those workflows are built."
-				/>
-			</WorkSurface>
+			<Suspense fallback={<SkeletonTable rows={4} columns={5} />}>
+				<ContactDocuments contactId={contact.id} />
+			</Suspense>
 		</>
 	)
 }

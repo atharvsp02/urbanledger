@@ -42,10 +42,6 @@ function buildHref(params: PaymentParams, patch: PaymentParams) {
 	return queryString === '' ? '/payments' : `/payments?${queryString}`
 }
 
-function documentHref(payment: PaymentSummary) {
-	return payment.direction === 'CUSTOMER_INCOMING' ? '/sales/invoices' : '/purchases/bills'
-}
-
 async function PaymentsTable({ params }: { params: PaymentParams }) {
 	const actor = await getActor()
 	const result = await listPayments(actor, {
@@ -66,7 +62,15 @@ async function PaymentsTable({ params }: { params: PaymentParams }) {
 			header: 'Direction',
 			cell: (payment) => <PaymentDirectionBadge direction={payment.direction} />
 		},
-		{ id: 'contact', header: 'Contact', cell: (payment) => payment.contact.name },
+		{
+			id: 'contact',
+			header: 'Contact',
+			cell: (payment) => (
+				<Link href={`/contacts/${payment.contact.id}`} className="text-accent hover:underline">
+					{payment.contact.name}
+				</Link>
+			)
+		},
 		{
 			id: 'paymentDate',
 			header: 'Date',

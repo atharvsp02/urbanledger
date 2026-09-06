@@ -25,9 +25,50 @@ export type PdfDocumentInput = {
 	notes: readonly string[]
 }
 
+const WIN_ANSI_SUBSTITUTES: Record<string, string> = {
+	'\u20b9': 'INR ',
+	'\u2013': '-',
+	'\u2014': '-',
+	'\u2018': "'",
+	'\u2019': "'",
+	'\u201c': '"',
+	'\u201d': '"',
+	'\u2022': '-',
+	'\u00a0': ' '
+}
+
+// The base-14 fonts encode WinAnsi only, so anything outside it would make
+// pdf-lib throw while drawing a document that must always render.
+function winAnsi(value: string) {
+	return Array.from(value, (character) => {
+		const substitute = WIN_ANSI_SUBSTITUTES[character]
+		if (substitute != null) return substitute
+		const code = character.codePointAt(0) ?? 0
+		return code >= 0x20 && code <= 0xff ? character : '?'
+	}).join('')
+}
+
 // Base-14 fonts are embedded by the renderer itself, so nothing is fetched at
 // request time.
-export async function renderDocumentPdf(input: PdfDocumentInput): Promise<Uint8Array> {
+export async function renderDocumentPdf(raw: PdfDocumentInput): Promise<Uint8Array> {
+	const input: PdfDocumentInput = {
+		...raw,
+		title: winAnsi(raw.title),
+		documentNumber: winAnsi(raw.documentNumber),
+		businessName: winAnsi(raw.businessName),
+		businessAddressLines: raw.businessAddressLines.map(winAnsi),
+		partyLabel: winAnsi(raw.partyLabel),
+		partyName: winAnsi(raw.partyName),
+		facts: raw.facts.map((fact) => ({ label: winAnsi(fact.label), value: winAnsi(fact.value) })),
+		columns: raw.columns.map((column) => ({ ...column, header: winAnsi(column.header) })),
+		rows: raw.rows.map((row) => row.map(winAnsi)),
+		totals: raw.totals.map((total) => ({
+			...total,
+			label: winAnsi(total.label),
+			value: winAnsi(total.value)
+		})),
+		notes: raw.notes.map(winAnsi)
+	}
 	const pdf = await PDFDocument.create()
 	pdf.setTitle(`${input.title} ${input.documentNumber}`)
 	pdf.setProducer('UrbanLedger')

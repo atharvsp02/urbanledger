@@ -49,7 +49,7 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
 			partyName: receipt.contact.name,
 			facts: [
 				{ label: 'Payment date', value: formatBusinessDate(receipt.paymentDate) },
-				{ label: 'Amount', value: formatAmount(receipt.amount) },
+				{ label: 'Amount', value: formatAmount(receipt.amount, { currencySymbol: '' }) },
 				{ label: 'Reference', value: receipt.reference ?? '-' },
 				{ label: 'Status', value: receipt.status === 'POSTED' ? 'Recorded' : 'Reversed' }
 			],
@@ -62,18 +62,25 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
 			rows: receipt.allocations.map((allocation) => [
 				allocation.document.number,
 				formatBusinessDate(allocation.effectiveDate),
-				formatAmount(allocation.amount),
-				formatAmount(allocation.reversedAmount)
+				formatAmount(allocation.amount, { currencySymbol: '' }),
+				formatAmount(allocation.reversedAmount, { currencySymbol: '' })
 			]),
 			totals: [
-				{ label: 'Payment amount', value: formatAmount(receipt.amount), emphasis: true },
-				{ label: 'Net applied', value: formatAmount(applied.toFixed(2)) }
+				{
+					label: 'Payment amount',
+					value: formatAmount(receipt.amount, { currencySymbol: '' }),
+					emphasis: true
+				},
+				{ label: 'Net applied', value: formatAmount(applied.toFixed(2), { currencySymbol: '' }) }
 			],
 			notes: [
 				receipt.status === 'REVERSED'
 					? `This payment was reversed${receipt.reversalDate == null ? '' : ` on ${formatBusinessDate(receipt.reversalDate)}`} and no longer settles the documents below.`
 					: 'This receipt confirms a payment recorded in UrbanLedger.',
-				'Recorded through the UrbanLedger payment simulator. No real money was transferred.'
+				`Amounts are in ${receipt.business.currency}.`,
+				...(receipt.sourceMode === 'PORTAL_SIMULATION'
+					? ['Recorded through the UrbanLedger payment simulator. No real money was transferred.']
+					: [])
 			]
 		})
 

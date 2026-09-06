@@ -59,21 +59,29 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
 			rows: invoice.lines.map((line) => [
 				line.productName,
 				formatQuantity(line.quantity),
-				formatAmount(trimMoneyScale(line.unitPrice)),
-				formatAmount(line.netTotal),
-				formatAmount(line.taxAmount),
-				formatAmount(line.total)
+				formatAmount(trimMoneyScale(line.unitPrice), { currencySymbol: '' }),
+				formatAmount(line.netTotal, { currencySymbol: '' }),
+				formatAmount(line.taxAmount, { currencySymbol: '' }),
+				formatAmount(line.total, { currencySymbol: '' })
 			]),
 			totals: [
-				{ label: 'Net', value: formatAmount(invoice.netTotal) },
-				{ label: 'Tax', value: formatAmount(invoice.taxTotal) },
-				{ label: 'Total', value: formatAmount(invoice.total), emphasis: true },
-				{ label: 'Paid', value: formatAmount(invoice.paidAmount) },
-				{ label: 'Outstanding', value: formatAmount(invoice.outstandingAmount), emphasis: true }
+				{ label: 'Net', value: formatAmount(invoice.netTotal, { currencySymbol: '' }) },
+				{ label: 'Tax', value: formatAmount(invoice.taxTotal, { currencySymbol: '' }) },
+				{
+					label: 'Total',
+					value: formatAmount(invoice.total, { currencySymbol: '' }),
+					emphasis: true
+				},
+				{ label: 'Paid', value: formatAmount(invoice.paidAmount, { currencySymbol: '' }) },
+				{
+					label: 'Outstanding',
+					value: formatAmount(invoice.outstandingAmount, { currencySymbol: '' }),
+					emphasis: true
+				}
 			],
 			notes: [
 				`Settlement status: ${invoice.status.replace('_', ' ').toLowerCase()}.`,
-				'Amounts are stated in the business currency and calculated by UrbanLedger.'
+				`Amounts are in ${invoice.business.currency} and calculated by UrbanLedger.`
 			]
 		})
 

@@ -74,6 +74,7 @@ export type PortalPaymentSummary = {
 	number: string
 	direction: 'CUSTOMER_INCOMING' | 'VENDOR_OUTGOING'
 	status: 'POSTED' | 'REVERSED'
+	sourceMode: 'STAFF' | 'PORTAL_SIMULATION'
 	paymentDate: string
 	amount: string
 	reference: string | null

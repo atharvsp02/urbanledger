@@ -145,10 +145,7 @@ export default async function PurchaseOrdersPage({
 				/>
 			</ListToolbar>
 
-			<Suspense
-				key={`${params.state}|${params.page}`}
-				fallback={<SkeletonTable rows={6} columns={6} />}
-			>
+			<Suspense fallback={<SkeletonTable rows={6} columns={6} />}>
 				<PurchaseOrdersTable params={params} />
 			</Suspense>
 		</>

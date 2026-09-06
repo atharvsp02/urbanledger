@@ -5,7 +5,7 @@ import { PageHeader } from '@/components/app-shell/page-header'
 import { Badge } from '@/components/ui/badge'
 import { buttonVariants } from '@/components/ui/button'
 import { DataTable, type TableColumn } from '@/components/ui/data-table'
-import { ListToolbar, ToolbarFilter } from '@/components/ui/list-toolbar'
+import { ListToolbar, ToolbarFilter, ToolbarSort } from '@/components/ui/list-toolbar'
 import { Pagination } from '@/components/ui/pagination'
 import { ContactAvatar } from '@/components/ui/placeholder'
 import { SkeletonTable } from '@/components/ui/skeleton'
@@ -186,30 +186,17 @@ export default async function ContactsPage({
 						{ value: 'include', label: 'Include archived' }
 					]}
 				/>
-				<ToolbarFilter
-					label="Sort by"
-					name="sort"
-					defaultValue={params.sort ?? 'name'}
+				<ToolbarSort
+					defaultSort={params.sort ?? 'name'}
+					defaultDirection={params.dir === 'desc' ? 'desc' : 'asc'}
 					options={contactSortColumns.map((value) => ({
 						value,
 						label: CONTACT_SORT_LABELS[value]
 					}))}
 				/>
-				<ToolbarFilter
-					label="Order"
-					name="dir"
-					defaultValue={params.dir === 'desc' ? 'desc' : 'asc'}
-					options={[
-						{ value: 'asc', label: 'Ascending' },
-						{ value: 'desc', label: 'Descending' }
-					]}
-				/>
 			</ListToolbar>
 
-			<Suspense
-				key={`${params.q}|${params.kind}|${params.archived}|${params.sort}|${params.dir}|${params.page}`}
-				fallback={<SkeletonTable rows={6} columns={6} />}
-			>
+			<Suspense fallback={<SkeletonTable rows={6} columns={6} />}>
 				<ContactsTable params={params} />
 			</Suspense>
 		</>

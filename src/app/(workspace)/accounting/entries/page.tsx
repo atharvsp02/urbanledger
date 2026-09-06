@@ -5,8 +5,7 @@ import { PageHeader } from '@/components/app-shell/page-header'
 import { Badge, type BadgeTone } from '@/components/ui/badge'
 import { buttonVariants } from '@/components/ui/button'
 import { DataTable, type TableColumn } from '@/components/ui/data-table'
-import { fieldControlClassName } from '@/components/ui/field'
-import { ToolbarFilter } from '@/components/ui/list-toolbar'
+import { ListToolbar, ToolbarDate, ToolbarFilter } from '@/components/ui/list-toolbar'
 import { Pagination } from '@/components/ui/pagination'
 import { SkeletonTable } from '@/components/ui/skeleton'
 import { EmptyState, ErrorState, ForbiddenState } from '@/components/ui/state-panel'
@@ -163,11 +162,11 @@ export default async function JournalEntriesPage({
 				}
 			/>
 
-			<form
-				method="get"
+			<ListToolbar
 				action="/accounting/entries"
-				aria-label="Filter journal entries"
-				className="flex flex-col gap-3 rounded-xl border border-border bg-surface p-4 sm:flex-row sm:flex-wrap sm:items-end"
+				hasSearch={false}
+				searchLabel="Filter journal entries"
+				resetHref="/accounting/entries"
 			>
 				<ToolbarFilter
 					label="Source"
@@ -181,36 +180,11 @@ export default async function JournalEntriesPage({
 						}))
 					]}
 				/>
-				<label className="flex flex-col gap-1.5 text-sm font-medium text-foreground">
-					From
-					<input
-						type="date"
-						name="from"
-						defaultValue={params.from}
-						className={fieldControlClassName}
-					/>
-				</label>
-				<label className="flex flex-col gap-1.5 text-sm font-medium text-foreground">
-					To
-					<input type="date" name="to" defaultValue={params.to} className={fieldControlClassName} />
-				</label>
-				<div className="flex flex-wrap gap-2">
-					<button type="submit" className={buttonVariants({ size: 'sm' })}>
-						Apply
-					</button>
-					<Link
-						href="/accounting/entries"
-						className={buttonVariants({ variant: 'secondary', size: 'sm' })}
-					>
-						Clear
-					</Link>
-				</div>
-			</form>
+				<ToolbarDate label="From" name="from" defaultValue={params.from} />
+				<ToolbarDate label="To" name="to" defaultValue={params.to} />
+			</ListToolbar>
 
-			<Suspense
-				key={`${params.source}|${params.from}|${params.to}|${params.page}`}
-				fallback={<SkeletonTable rows={6} columns={7} />}
-			>
+			<Suspense fallback={<SkeletonTable rows={6} columns={7} />}>
 				<EntriesTable actor={actor} params={params} />
 			</Suspense>
 		</>

@@ -2,10 +2,8 @@ import { Suspense } from 'react'
 import Link from 'next/link'
 import { Truck } from 'lucide-react'
 import { PageHeader } from '@/components/app-shell/page-header'
-import { buttonVariants } from '@/components/ui/button'
 import { DataTable, type TableColumn } from '@/components/ui/data-table'
-import { Field, FieldRow } from '@/components/ui/field'
-import { TextInput } from '@/components/ui/inputs'
+import { ListToolbar, ToolbarDate } from '@/components/ui/list-toolbar'
 import { Pagination } from '@/components/ui/pagination'
 import { SkeletonTable } from '@/components/ui/skeleton'
 import { EmptyState, ErrorState } from '@/components/ui/state-panel'
@@ -109,40 +107,17 @@ export default async function SalesDeliveriesPage({
 				lead="Physical dispatch and service fulfilment. Deliveries change quantity, never the ledger."
 			/>
 
-			<form
-				method="get"
+			<ListToolbar
 				action="/sales/deliveries"
-				className="flex flex-col gap-3 rounded-xl border border-border bg-surface p-4 sm:flex-row sm:items-end"
+				hasSearch={false}
+				searchLabel="Filter sales deliveries"
+				resetHref="/sales/deliveries"
 			>
-				<FieldRow className="sm:w-auto sm:grid-cols-2">
-					<Field id="deliveries-from" label="From" inRow>
-						{(props) => (
-							<TextInput {...props} type="date" name="from" defaultValue={params.from ?? ''} />
-						)}
-					</Field>
-					<Field id="deliveries-to" label="To" inRow>
-						{(props) => (
-							<TextInput {...props} type="date" name="to" defaultValue={params.to ?? ''} />
-						)}
-					</Field>
-				</FieldRow>
-				<div className="flex flex-wrap gap-2">
-					<button type="submit" className={buttonVariants({ size: 'sm' })}>
-						Apply
-					</button>
-					<Link
-						href="/sales/deliveries"
-						className={buttonVariants({ variant: 'secondary', size: 'sm' })}
-					>
-						Clear
-					</Link>
-				</div>
-			</form>
+				<ToolbarDate label="From" name="from" defaultValue={params.from} />
+				<ToolbarDate label="To" name="to" defaultValue={params.to} />
+			</ListToolbar>
 
-			<Suspense
-				key={`${params.from}|${params.to}|${params.page}`}
-				fallback={<SkeletonTable rows={6} columns={5} />}
-			>
+			<Suspense fallback={<SkeletonTable rows={6} columns={5} />}>
 				<DeliveriesTable params={params} />
 			</Suspense>
 		</>

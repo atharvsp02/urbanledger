@@ -3,10 +3,8 @@ import Link from 'next/link'
 import { ArrowDownLeft, ArrowUpRight, History } from 'lucide-react'
 import { PageHeader } from '@/components/app-shell/page-header'
 import { Badge } from '@/components/ui/badge'
-import { buttonVariants } from '@/components/ui/button'
 import { DataTable, type TableColumn } from '@/components/ui/data-table'
-import { Field, FieldRow } from '@/components/ui/field'
-import { SelectInput, TextInput } from '@/components/ui/inputs'
+import { ListToolbar, ToolbarDate, ToolbarFilter } from '@/components/ui/list-toolbar'
 import { Pagination } from '@/components/ui/pagination'
 import { SkeletonTable } from '@/components/ui/skeleton'
 import { EmptyState, ErrorState } from '@/components/ui/state-panel'
@@ -148,52 +146,26 @@ export default async function StockMovementsPage({
 				breadcrumbs={[{ label: 'Stock', href: '/stock' }, { label: 'Movements' }]}
 			/>
 
-			<form
-				method="get"
+			<ListToolbar
 				action="/stock/movements"
-				className="flex flex-col gap-3 rounded-xl border border-border bg-surface p-4 sm:flex-row sm:flex-wrap sm:items-end"
+				hasSearch={false}
+				searchLabel="Filter stock movements"
+				resetHref="/stock/movements"
 			>
-				<FieldRow className="sm:w-auto sm:grid-cols-2">
-					<Field id="movements-from" label="From" inRow>
-						{(props) => (
-							<TextInput {...props} type="date" name="from" defaultValue={params.from ?? ''} />
-						)}
-					</Field>
-					<Field id="movements-to" label="To" inRow>
-						{(props) => (
-							<TextInput {...props} type="date" name="to" defaultValue={params.to ?? ''} />
-						)}
-					</Field>
-				</FieldRow>
-				<Field id="movements-product" label="Product" className="sm:w-56">
-					{(props) => (
-						<SelectInput {...props} name="product" defaultValue={params.product ?? 'ALL'}>
-							<option value="ALL">All products</option>
-							{products.map((product) => (
-								<option key={product.id} value={product.id}>
-									{product.name}
-								</option>
-							))}
-						</SelectInput>
-					)}
-				</Field>
-				<div className="flex flex-wrap gap-2">
-					<button type="submit" className={buttonVariants({ size: 'sm' })}>
-						Apply
-					</button>
-					<Link
-						href="/stock/movements"
-						className={buttonVariants({ variant: 'secondary', size: 'sm' })}
-					>
-						Clear
-					</Link>
-				</div>
-			</form>
+				<ToolbarDate label="From" name="from" defaultValue={params.from} />
+				<ToolbarDate label="To" name="to" defaultValue={params.to} />
+				<ToolbarFilter
+					label="Product"
+					name="product"
+					defaultValue={params.product ?? 'ALL'}
+					options={[
+						{ value: 'ALL', label: 'All products' },
+						...products.map((product) => ({ value: product.id, label: product.name }))
+					]}
+				/>
+			</ListToolbar>
 
-			<Suspense
-				key={`${params.from}|${params.to}|${params.product}|${params.page}`}
-				fallback={<SkeletonTable rows={6} columns={6} />}
-			>
+			<Suspense fallback={<SkeletonTable rows={6} columns={6} />}>
 				<MovementsTable params={params} />
 			</Suspense>
 		</>

@@ -181,7 +181,12 @@ export function ToolbarFilter({
 			<label htmlFor={id} className="text-sm font-medium text-foreground">
 				{label}
 			</label>
-			<SelectInput key={defaultValue} id={id} name={name} defaultValue={defaultValue ?? fallbackValue}>
+			<SelectInput
+				key={defaultValue}
+				id={id}
+				name={name}
+				defaultValue={defaultValue ?? fallbackValue}
+			>
 				{options.map((option) => (
 					<option key={option.value} value={option.value}>
 						{option.label}

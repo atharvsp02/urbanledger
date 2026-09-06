@@ -42,6 +42,7 @@ export function ReceiptControl({
 			<FormErrorSummary
 				errors={fieldErrorEntries(state, 'receipt', RECEIPT_LABELS)}
 				description={state?.ok === false ? state.error.message : undefined}
+				code={state?.ok === false ? state.error.code : undefined}
 			/>
 
 			<FieldRow className="sm:grid-cols-[16rem_auto] sm:items-end">
@@ -102,6 +103,7 @@ export function VendorBillControl({
 			<FormErrorSummary
 				errors={fieldErrorEntries(state, 'bill', BILL_LABELS)}
 				description={state?.ok === false ? state.error.message : undefined}
+				code={state?.ok === false ? state.error.code : undefined}
 			/>
 
 			<FieldRow className="sm:grid-cols-3">

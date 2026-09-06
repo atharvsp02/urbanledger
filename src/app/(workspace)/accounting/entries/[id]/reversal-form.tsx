@@ -39,6 +39,7 @@ export function ReversalForm({
 				<FormErrorSummary
 					errors={fieldErrorEntries(state, 'reversal', FIELD_LABELS)}
 					description={state?.ok === false ? state.error.message : undefined}
+					code={state?.ok === false ? state.error.code : undefined}
 				/>
 				<div className="grid gap-4 sm:grid-cols-2">
 					<Field

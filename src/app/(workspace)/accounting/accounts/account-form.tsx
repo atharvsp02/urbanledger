@@ -50,6 +50,7 @@ export function AccountForm({
 			<FormErrorSummary
 				errors={fieldErrorEntries(state, 'account', FIELD_LABELS)}
 				description={state?.ok === false ? state.error.message : undefined}
+				code={state?.ok === false ? state.error.code : undefined}
 			/>
 
 			<div className="flex flex-col gap-5 rounded-xl border border-border bg-surface p-5">

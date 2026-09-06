@@ -154,6 +154,7 @@ export function JournalEntryForm({
 			<FormErrorSummary
 				errors={fieldErrorEntries(state, 'journal', FIELD_LABELS)}
 				description={state?.ok === false ? state.error.message : undefined}
+				code={state?.ok === false ? state.error.code : undefined}
 			/>
 
 			<div className="grid gap-5 rounded-xl border border-border bg-surface p-5 lg:grid-cols-2">

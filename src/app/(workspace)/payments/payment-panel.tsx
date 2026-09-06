@@ -48,6 +48,7 @@ export function PaymentPanel({
 			<FormErrorSummary
 				errors={fieldErrorEntries(state, 'payment', FIELD_LABELS)}
 				description={state?.ok === false ? state.error.message : undefined}
+				code={state?.ok === false ? state.error.code : undefined}
 			/>
 
 			<FieldRow className="sm:grid-cols-2 lg:grid-cols-4">

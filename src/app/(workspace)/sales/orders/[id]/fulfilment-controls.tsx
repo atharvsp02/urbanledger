@@ -42,6 +42,7 @@ export function DeliveryControl({
 			<FormErrorSummary
 				errors={fieldErrorEntries(state, 'delivery', DELIVERY_LABELS)}
 				description={state?.ok === false ? state.error.message : undefined}
+				code={state?.ok === false ? state.error.code : undefined}
 			/>
 
 			<FieldRow className="sm:grid-cols-[16rem_auto] sm:items-end">
@@ -102,6 +103,7 @@ export function InvoiceControl({
 			<FormErrorSummary
 				errors={fieldErrorEntries(state, 'invoice', INVOICE_LABELS)}
 				description={state?.ok === false ? state.error.message : undefined}
+				code={state?.ok === false ? state.error.code : undefined}
 			/>
 
 			<FieldRow className="sm:grid-cols-3">

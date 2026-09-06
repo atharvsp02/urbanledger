@@ -35,6 +35,7 @@ export function PaymentReversalControl({
 			<FormErrorSummary
 				errors={fieldErrorEntries(state, 'reversal', FIELD_LABELS)}
 				description={state?.ok === false ? state.error.message : undefined}
+				code={state?.ok === false ? state.error.code : undefined}
 			/>
 
 			<FieldRow className="sm:grid-cols-[14rem_minmax(0,1fr)]">

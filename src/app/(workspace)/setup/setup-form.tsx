@@ -44,6 +44,7 @@ export function SetupForm({
 			<FormErrorSummary
 				errors={fieldErrorEntries(state, 'setup', FIELD_LABELS)}
 				description={state?.ok === false ? state.error.message : undefined}
+				code={state?.ok === false ? state.error.code : undefined}
 			/>
 
 			{state?.ok === true && (

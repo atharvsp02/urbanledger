@@ -58,6 +58,7 @@ export function CompanyForm({ settings }: { settings: BusinessSettings }) {
 			<FormErrorSummary
 				errors={fieldErrorEntries(state, 'company', FIELD_LABELS)}
 				description={state?.ok === false ? state.error.message : undefined}
+				code={state?.ok === false ? state.error.code : undefined}
 			/>
 
 			{state?.ok === true && (
